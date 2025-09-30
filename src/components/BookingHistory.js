@@ -44,14 +44,16 @@ const BookingHistory = () => {
         case 'heute':
           matchesDate = entryDate.toDateString() === today.toDateString();
           break;
-        case 'woche':
+        case 'woche': {
           const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
           matchesDate = entryDate >= weekAgo;
           break;
-        case 'monat':
+        }
+        case 'monat': {
           const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
           matchesDate = entryDate >= monthAgo;
           break;
+        }
         default:
           matchesDate = true; // Alle anzeigen wenn kein Filter
           break;
