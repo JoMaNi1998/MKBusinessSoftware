@@ -129,6 +129,11 @@ jobs:
       - name: Install Firebase CLI
         run: npm i -g firebase-tools@^14.0.0
 
+      - name: Install Functions dependencies
+        run: |
+          cd functions
+          npm ci
+
       - name: Auth to Google (Service Account)
         uses: google-github-actions/auth@v2
         with:
@@ -147,13 +152,23 @@ jobs:
             echo "ENV=development" >> $GITHUB_OUTPUT
           fi
 
+      - name: Deploy Firebase Functions
+        env:
+          PROJECT: ${{ steps.env.outputs.PROJECT }}
+          ENV: ${{ steps.env.outputs.ENV }}
+        run: |
+          firebase use $PROJECT
+          echo "🔧 Deploying Functions to $ENV environment ($PROJECT)..."
+          firebase deploy --only functions --force --non-interactive
+          echo "✅ Functions deployed!"
+
       - name: Deploy to Firebase Hosting
         env:
           PROJECT: ${{ steps.env.outputs.PROJECT }}
           ENV: ${{ steps.env.outputs.ENV }}
         run: |
           firebase use $PROJECT
-          echo "🚀 Deploying to $ENV environment ($PROJECT)..."
+          echo "🚀 Deploying Hosting to $ENV environment ($PROJECT)..."
           firebase deploy --only hosting --force --non-interactive
           echo "✅ Successfully deployed Lager-System to $ENV!"
 
@@ -162,5 +177,17 @@ jobs:
           PROJECT: ${{ steps.env.outputs.PROJECT }}
         run: |
           firebase use $PROJECT
+          echo "📋 Deploying Firestore Rules..."
           firebase deploy --only firestore:rules --force --non-interactive
           echo "✅ Firestore rules deployed!"
+
+      - name: Deployment Summary
+        env:
+          ENV: ${{ steps.env.outputs.ENV }}
+          PROJECT: ${{ steps.env.outputs.PROJECT }}
+        run: |
+          echo "🎉 Complete deployment to $ENV finished!"
+          echo "📦 Functions: ✅ Deployed"
+          echo "🌐 Hosting: ✅ Deployed" 
+          echo "📋 Firestore Rules: ✅ Deployed"
+          echo "🔗 Project: $PROJECT"
