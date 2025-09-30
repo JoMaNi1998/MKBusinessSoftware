@@ -11,17 +11,13 @@ const ROLES = {
     name: 'Administrator',
     permissions: ['materials', 'customers', 'projects', 'vde', 'bookings', 'orders', 'settings', 'pv-configurator']
   },
-  pv_admin: {
-    name: 'PV Administrator', 
-    permissions: ['pv-configurator', 'settings']
+  monteur: {
+    name: 'Monteur',
+    permissions: ['materials', 'vde', 'bookings']
   },
-  mitarbeiter: {
-    name: 'Mitarbeiter',
-    permissions: ['materials', 'customers', 'projects', 'vde', 'bookings']
-  },
-  readonly: {
-    name: 'Nur Lesen',
-    permissions: ['materials', 'customers', 'projects']
+  projektleiter: {
+    name: 'Projektleiter',
+    permissions: ['materials', 'customers', 'projects', 'vde', 'bookings', 'orders', 'pv-configurator']
   }
 };
 
@@ -133,11 +129,11 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
       .where('role', '==', 'admin')
       .get();
 
-    // Wenn Admins existieren, als Mitarbeiter einrichten
+    // Wenn Admins existieren, als Monteur einrichten
     if (!existingAdmins.empty) {
       const defaultClaims = {
-        role: 'mitarbeiter',
-        permissions: ROLES.mitarbeiter.permissions
+        role: 'monteur',
+        permissions: ROLES.monteur.permissions
       };
 
       await admin.auth().setCustomUserClaims(user.uid, defaultClaims);
@@ -145,8 +141,8 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
       await admin.firestore().collection('users').doc(user.uid).set({
         email: user.email,
         displayName: user.displayName || user.email.split('@')[0],
-        role: 'mitarbeiter',
-        permissions: ROLES.mitarbeiter.permissions,
+        role: 'monteur',
+        permissions: ROLES.monteur.permissions,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }

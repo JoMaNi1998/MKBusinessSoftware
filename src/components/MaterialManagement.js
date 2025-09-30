@@ -6,7 +6,6 @@ import {
   Filter,
   Edit,
   Trash2,
-  Download,
   AlertTriangle,
   MoreVertical,
   TrendingUp,
@@ -387,16 +386,6 @@ const MaterialManagement = () => {
     return `${Number(price).toFixed(2).replace('.', ',')} €`;
   };
 
-  const handleExportData = () => {
-    const dataStr = JSON.stringify(materials, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `materialien_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    showNotification('Daten erfolgreich exportiert', 'success');
-  };
 
   return (
     <div className="h-full flex flex-col space-y-6">
@@ -409,13 +398,6 @@ const MaterialManagement = () => {
           </p>
         </div>
         <div className="flex space-x-3">
-          <button
-            onClick={handleExportData}
-            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center space-x-2"
-          >
-            <Download className="h-4 w-4" />
-            <span>Exportieren</span>
-          </button>
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => handleOpenBooking('Eingang')}

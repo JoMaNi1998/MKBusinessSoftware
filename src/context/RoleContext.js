@@ -62,14 +62,14 @@ export const RoleProvider = ({ children }) => {
         setUserRole(claims.role);
         setPermissions(claims.permissions || []);
       } else {
-        // Fallback: Standard-Mitarbeiter-Rolle
-        setUserRole('mitarbeiter');
-        setPermissions(['materials', 'customers', 'projects', 'vde', 'bookings']);
+        // Fallback: Standard-Monteur-Rolle
+        setUserRole('monteur');
+        setPermissions(['materials', 'vde', 'bookings']);
       }
     } catch (error) {
       console.error('Fehler beim Laden der User-Rolle:', error);
-      setUserRole('mitarbeiter');
-      setPermissions(['materials', 'customers', 'projects', 'vde', 'bookings']);
+      setUserRole('monteur');
+      setPermissions(['materials', 'vde', 'bookings']);
     } finally {
       setLoading(false);
     }
@@ -83,8 +83,12 @@ export const RoleProvider = ({ children }) => {
     return userRole === 'admin';
   };
 
-  const isPVAdmin = () => {
-    return userRole === 'pv_admin' || userRole === 'admin';
+  const isProjektleiter = () => {
+    return userRole === 'projektleiter' || userRole === 'admin';
+  };
+
+  const isMonteur = () => {
+    return userRole === 'monteur';
   };
 
   const canAccessModule = (module) => {
@@ -126,7 +130,8 @@ export const RoleProvider = ({ children }) => {
     loading,
     hasPermission,
     isAdmin,
-    isPVAdmin,
+    isProjektleiter,
+    isMonteur,
     canAccessModule,
     assignUserRole,
     setupFirstAdmin,

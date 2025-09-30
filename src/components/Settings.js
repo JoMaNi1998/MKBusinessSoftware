@@ -42,7 +42,7 @@ const Settings = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [newUserRole, setNewUserRole] = useState('mitarbeiter');
+  const [newUserRole, setNewUserRole] = useState('monteur');
   const [assigningRole, setAssigningRole] = useState(false);
   
   // PV Configurator Default Settings
@@ -173,7 +173,7 @@ const Settings = () => {
       showNotification('Rolle erfolgreich zugewiesen', 'success');
       setIsUserModalOpen(false);
       setSelectedUser(null);
-      setNewUserRole('mitarbeiter');
+      setNewUserRole('monteur');
       loadUsers(); // Benutzer neu laden
     } catch (error) {
       console.error('Fehler beim Zuweisen der Rolle:', error);
@@ -185,16 +185,15 @@ const Settings = () => {
 
   const openUserModal = (user) => {
     setSelectedUser(user);
-    setNewUserRole(user.role || 'mitarbeiter');
+    setNewUserRole(user.role || 'monteur');
     setIsUserModalOpen(true);
   };
 
   const getRoleDisplayName = (role) => {
     const roleNames = {
       admin: 'Administrator',
-      pv_admin: 'PV Administrator',
-      mitarbeiter: 'Mitarbeiter',
-      readonly: 'Nur Lesen'
+      monteur: 'Monteur',
+      projektleiter: 'Projektleiter'
     };
     return roleNames[role] || role;
   };
@@ -202,9 +201,8 @@ const Settings = () => {
   const getRoleBadgeColor = (role) => {
     const colors = {
       admin: 'bg-red-100 text-red-800',
-      pv_admin: 'bg-blue-100 text-blue-800',
-      mitarbeiter: 'bg-green-100 text-green-800',
-      readonly: 'bg-gray-100 text-gray-800'
+      monteur: 'bg-blue-100 text-blue-800',
+      projektleiter: 'bg-green-100 text-green-800'
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
@@ -2866,9 +2864,8 @@ const Settings = () => {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="admin">Administrator - Vollzugriff auf alle Module</option>
-              <option value="pv_admin">PV Administrator - PV Konfigurator und Einstellungen</option>
-              <option value="mitarbeiter">Mitarbeiter - Standard Berechtigungen</option>
-              <option value="readonly">Nur Lesen - Schreibgeschützt</option>
+              <option value="projektleiter">Projektleiter - Projekte, Kunden, Bestellungen, PV Konfigurator</option>
+              <option value="monteur">Monteur - Materialien, VDE Protokolle, Buchungen</option>
             </select>
           </div>
 
