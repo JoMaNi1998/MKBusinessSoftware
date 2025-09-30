@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Settings as SettingsIcon, 
   Package, 
@@ -157,9 +157,9 @@ const Settings = () => {
   // Kategorie- und Spezifikations-Funktionen
   useEffect(() => {
     loadCategoriesAndSpecs();
-  }, []);
+  }, [loadCategoriesAndSpecs]);
 
-  const loadCategoriesAndSpecs = async () => {
+  const loadCategoriesAndSpecs = useCallback(async () => {
     try {
       setLoading(true);
       const categoriesData = await FirebaseService.getDocuments('categories');
@@ -182,7 +182,7 @@ const Settings = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {

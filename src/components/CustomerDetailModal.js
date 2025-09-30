@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Save,
   User,
@@ -533,7 +533,7 @@ const CustomerModal = ({
   }, [getProjectsByCustomer, customerId]);
 
   /** ----- Kostenberechnung ----- */
-  const loadCustomerCosts = async () => {
+  const loadCustomerCosts = useCallback(async () => {
     if (!isView || !customerProjects.length) return;
     setLoadingCosts(true);
     try {
@@ -545,14 +545,14 @@ const CustomerModal = ({
     } finally {
       setLoadingCosts(false);
     }
-  };
+  }, [isView, customerProjects, bookings]);
 
   // Kosten laden wenn sich Projekte oder Buchungen ändern
   useEffect(() => {
     if (isView && customerProjects.length >= 0) {
       loadCustomerCosts();
     }
-  }, [isView, customerProjects, bookings]);
+  }, [isView, customerProjects, bookings, loadCustomerCosts]);
 
   if (!isOpen) return null;
 

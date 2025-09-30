@@ -1,14 +1,12 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   Package, 
   Users, 
   Building, 
   History, 
   FileText, 
   Settings, 
-  Zap,
   Home,
   Menu,
   X,

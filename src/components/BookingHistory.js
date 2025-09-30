@@ -52,6 +52,9 @@ const BookingHistory = () => {
           const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
           matchesDate = entryDate >= monthAgo;
           break;
+        default:
+          matchesDate = true; // Alle anzeigen wenn kein Filter
+          break;
       }
     }
     

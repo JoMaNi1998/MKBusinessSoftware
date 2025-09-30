@@ -21,7 +21,7 @@ export const sanitizeDocumentId = (id) => {
   return id.toString()
     .replace(/\//g, '-SLASH-')  // Schrägstriche ersetzen
     .replace(/\./g, '-DOT-')    // Punkte ersetzen
-    .replace(/\#/g, '-HASH-')   // Hashtags ersetzen
+    .replace(/#/g, '-HASH-')   // Hashtags ersetzen
     .replace(/\[/g, '-LBRACKET-') // Eckige Klammern ersetzen
     .replace(/\]/g, '-RBRACKET-')
     .replace(/\$/g, '-DOLLAR-'); // Dollar-Zeichen ersetzen

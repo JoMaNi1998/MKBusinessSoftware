@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Building, FileText } from 'lucide-react';
+import { User, Building, FileText } from 'lucide-react';
 import { useProjects } from '../context/ProjectContext';
 import { useCustomers } from '../context/CustomerContext';
 import { FirebaseService } from '../services/firebaseService';

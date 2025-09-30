@@ -806,7 +806,7 @@ const Page4_ACSeitePruefbericht = React.memo(function Page4_ACSeitePruefbericht(
 /** =========================================================================
  *  SEITE 5: PV‑Generator Prüfbericht
  *  ========================================================================= */
-const Page5_PVGeneratorPruefbericht_Single = React.memo(function Page5_PVGeneratorPruefbericht_Single({
+const Page5PVGeneratorPruefberichtSingle = React.memo(function Page5PVGeneratorPruefberichtSingle({
   vdeData,
   handleVdeDataChange,
   inverterData,
@@ -1193,7 +1193,7 @@ const Page5_PVGeneratorPruefbericht = React.memo(function Page5_PVGeneratorPruef
       const start = (p - 1) * perPage;
       const end = Math.min(start + perPage, total);
       pages.push(
-        <Page5_PVGeneratorPruefbericht_Single
+        <Page5PVGeneratorPruefberichtSingle
           key={`inv-${invIdx}-p-${p}`}
           vdeData={vdeData}
           handleVdeDataChange={handleVdeDataChange}

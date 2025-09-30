@@ -14,13 +14,10 @@ import { useProjects } from '../context/ProjectContext';
 import { useBookings } from '../context/BookingContext';
 import { useMaterials } from '../context/MaterialContext';
 
-const cn = (...c) => c.filter(Boolean).join(' ');
 const toNumber = (v, d = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
 };
-
-const getCustomerById = (customers, id) => customers.find((c) => c.id === id);
 const getCustomerName = (c) => c?.firmennameKundenname || c?.name || 'Unbekannter Kunde';
 const getCustomerAddress = (c) => {
   if (!c) return 'Keine Adresse';
@@ -137,6 +134,7 @@ const BillOfMaterials = () => {
     setBomItems(next);
     initialBuild.current = false;
   }, [selectedProject, rebuildVersion]); // absichtsvoll NICHT bookings/materials, um manuelle Anpassungen nicht zu überschreiben
+  // eslint-disable-next-line react-hooks/exhaustive-deps
 
   const handleRefreshFromBookings = () => {
     setRebuildVersion((v) => v + 1);
@@ -187,13 +185,6 @@ const BillOfMaterials = () => {
 
   // ---- Ableitungen ----
   const customer = selectedProject ? customersById.get(selectedProject.customerID) : null;
-  const summary = useMemo(
-    () => ({
-      positions: bomItems.length,
-      totalUnits: bomItems.reduce((s, x) => s + toNumber(x.totalUnits, 0), 0)
-    }),
-    [bomItems]
-  );
 
   // ---- UI: Projektauswahl ----
   if (showProjectSelect) {

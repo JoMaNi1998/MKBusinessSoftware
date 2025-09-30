@@ -7,17 +7,12 @@ import {
   Edit,
   Trash2,
   Download,
-  Upload,
   AlertTriangle,
   MoreVertical,
   TrendingUp,
   TrendingDown,
   ExternalLink,
-  Minus,
-  Settings,
-  Eye,
-  EyeOff,
-  AlertCircle
+  Settings
 } from 'lucide-react';
 import { useMaterials } from '../context/MaterialContext';
 import { useNotification } from '../context/NotificationContext';
@@ -129,9 +124,10 @@ const MaterialManagement = () => {
       if (value === 'alle') return true;
       
       switch (column) {
-        case 'category':
+        case 'category': {
           const categoryName = categories.find(cat => cat.id === material.categoryId)?.name;
           return categoryName === value;
+        }
         case 'status':
           return getStockStatusText(material.stock, material.heatStock, material.orderStatus) === value;
         case 'manufacturer':
