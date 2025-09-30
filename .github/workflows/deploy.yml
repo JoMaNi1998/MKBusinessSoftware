@@ -132,7 +132,7 @@ jobs:
       - name: Install Functions dependencies
         run: |
           cd functions
-          npm ci
+          npm install
 
       - name: Auth to Google (Service Account)
         uses: google-github-actions/auth@v2
