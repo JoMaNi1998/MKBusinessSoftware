@@ -1,0 +1,169 @@
+name: Lager CI/CD (React + Firebase)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_PROD: lager-d3a17          # Production Firebase Project
+  PROJECT_DEV: lager-d3a17           # Development Firebase Project (gleich für Start)
+  NODE_VERSION: 20
+
+concurrency:
+  group: lager-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint & Build Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Build React app
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-files
+          path: build/
+          retention-days: 1
+
+  preview:
+    name: Preview Deploy (PR)
+    needs: checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-files
+          path: build/
+
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools@^14.0.0
+
+      - name: Auth to Google (Service Account)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          export_environment_variables: true
+
+      - name: Deploy Preview Channel
+        run: |
+          firebase use ${{ env.PROJECT_DEV }}
+          firebase hosting:channel:deploy pr-${{ github.event.number }} --expires 7d
+          echo "🔍 Preview deployed for PR #${{ github.event.number }}"
+
+  deploy:
+    name: Deploy to Firebase
+    needs: checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build React app
+        run: npm run build
+
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools@^14.0.0
+
+      - name: Auth to Google (Service Account)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          export_environment_variables: true
+
+      - name: Select Firebase project by branch
+        id: env
+        run: |
+          BR="${GITHUB_REF##*/}"
+          if [ "$BR" = "main" ]; then
+            echo "PROJECT=${{ env.PROJECT_PROD }}" >> $GITHUB_OUTPUT
+            echo "ENV=production" >> $GITHUB_OUTPUT
+          else
+            echo "PROJECT=${{ env.PROJECT_DEV }}" >> $GITHUB_OUTPUT
+            echo "ENV=development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to Firebase Hosting
+        env:
+          PROJECT: ${{ steps.env.outputs.PROJECT }}
+          ENV: ${{ steps.env.outputs.ENV }}
+        run: |
+          firebase use $PROJECT
+          echo "🚀 Deploying to $ENV environment ($PROJECT)..."
+          firebase deploy --only hosting --force --non-interactive
+          echo "✅ Successfully deployed Lager-System to $ENV!"
+
+      - name: Deploy Firestore Rules
+        env:
+          PROJECT: ${{ steps.env.outputs.PROJECT }}
+        run: |
+          firebase use $PROJECT
+          firebase deploy --only firestore:rules --force --non-interactive
+          echo "✅ Firestore rules deployed!"
