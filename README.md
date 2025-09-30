@@ -36,7 +36,7 @@ npm start
 
 ```bash
 # Entwicklung
-npm start              # Entwicklungsserver (http://localhost:3000)
+npm start              # Entwicklungsserver (http://localhost:3000)fff
 npm test               # Tests ausführen
 npm run build          # Production Build erstellen tt
 
