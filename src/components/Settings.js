@@ -155,10 +155,6 @@ const Settings = () => {
   }, []);
 
   // Kategorie- und Spezifikations-Funktionen
-  useEffect(() => {
-    loadCategoriesAndSpecs();
-  }, [loadCategoriesAndSpecs]);
-
   const loadCategoriesAndSpecs = useCallback(async () => {
     try {
       setLoading(true);
@@ -182,7 +178,12 @@ const Settings = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showNotification]);
+
+  // Load categories and specs on component mount
+  useEffect(() => {
+    loadCategoriesAndSpecs();
+  }, [loadCategoriesAndSpecs]);
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
