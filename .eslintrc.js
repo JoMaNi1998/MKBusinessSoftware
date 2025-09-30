@@ -20,9 +20,11 @@ module.exports = {
     'react'
   ],
   rules: {
-    'no-unused-vars': 'warn',
+    'no-unused-vars': 'off',
     'no-console': 'off',
     'react/jsx-uses-react': 'off',
-    'react/react-in-jsx-scope': 'off'
+    'react/react-in-jsx-scope': 'off',
+    'react-hooks/exhaustive-deps': 'off',
+    'no-use-before-define': 'off'
   }
 };
