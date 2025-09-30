@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { RoleProvider } from './context/RoleContext';
 import { MaterialProvider } from './context/MaterialContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { CustomerProvider } from './context/CustomerContext';
@@ -17,6 +18,7 @@ import BillOfMaterials from './components/BillOfMaterials';
 import VDEProtocols from './components/VDEProtocols';
 import PVConfigurator from './components/PVConfigurator';
 import Settings from './components/Settings';
+import UserAvatar from './components/UserAvatar';
 import Sidebar from './components/Sidebar';
 
 function App() {
@@ -24,11 +26,12 @@ function App() {
 
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <CustomerProvider>
-          <ProjectProvider>
-            <BookingProvider>
-              <MaterialProvider>
+      <RoleProvider>
+        <NotificationProvider>
+          <CustomerProvider>
+            <ProjectProvider>
+              <BookingProvider>
+                <MaterialProvider>
                 <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                   <div className="min-h-dvh bg-gray-50">
                     <Routes>
@@ -60,11 +63,12 @@ function App() {
                     </Routes>
                   </div>
                 </Router>
-              </MaterialProvider>
-            </BookingProvider>
-          </ProjectProvider>
-        </CustomerProvider>
-      </NotificationProvider>
+                </MaterialProvider>
+              </BookingProvider>
+            </ProjectProvider>
+          </CustomerProvider>
+        </NotificationProvider>
+      </RoleProvider>
     </AuthProvider>
   );
 }

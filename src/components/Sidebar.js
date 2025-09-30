@@ -12,19 +12,38 @@ import {
   X,
   ShoppingCart
 } from 'lucide-react';
+import UserAvatar from './UserAvatar';
+import { useRoleSafe } from '../context/RoleContext';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
-  const navigation = [
-    { name: 'Materialien', href: '/materials', icon: Package },
-    { name: 'Bestellungen', href: '/orders', icon: ShoppingCart },
-    { name: 'Kunden', href: '/customers', icon: Users },
-    { name: 'Projekte', href: '/projects', icon: Building },
-    { name: 'Buchungshistorie', href: '/bookings', icon: History },
-    { name: 'Stückliste', href: '/bill-of-materials', icon: FileText },
-    { name: 'VDE Protokolle', href: '/vde-protocols', icon: FileText },
-    { name: 'PV Konfigurator', href: '/pv-configurator', icon: Home },
-    { name: 'Einstellungen', href: '/settings', icon: Settings },
+  const { canAccessModule, loading } = useRoleSafe();
+
+  const allNavigation = [
+    { name: 'Materialien', href: '/materials', icon: Package, permission: 'materials' },
+    { name: 'Bestellungen', href: '/orders', icon: ShoppingCart, permission: 'orders' },
+    { name: 'Kunden', href: '/customers', icon: Users, permission: 'customers' },
+    { name: 'Projekte', href: '/projects', icon: Building, permission: 'projects' },
+    { name: 'Buchungshistorie', href: '/bookings', icon: History, permission: 'bookings' },
+    { name: 'Stückliste', href: '/bill-of-materials', icon: FileText, permission: 'materials' },
+    { name: 'VDE Protokolle', href: '/vde-protocols', icon: FileText, permission: 'vde' },
+    { name: 'PV Konfigurator', href: '/pv-configurator', icon: Home, permission: 'pv-configurator' },
+    { name: 'Einstellungen', href: '/settings', icon: Settings, permission: 'settings' },
   ];
+
+  // Navigation basierend auf Berechtigungen filtern
+  const navigation = allNavigation.filter(item => 
+    canAccessModule(item.permission)
+  );
+
+  if (loading) {
+    return (
+      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg">
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -78,8 +97,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           </div>
         </nav>
 
-        <div className="absolute bottom-0 w-full p-4">
-          <div className="bg-gray-50 rounded-lg p-3">
+        <div className="absolute bottom-0 w-full p-4 space-y-3">
+          {/* User Avatar */}
+          <div className="flex justify-center">
+            <UserAvatar />
+          </div>
+          
+          {/* Version Info */}
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
             <p className="text-xs text-gray-500">Version 1.0.0</p>
             <p className="text-xs text-gray-500">© 2024 Lagermanagement</p>
           </div>

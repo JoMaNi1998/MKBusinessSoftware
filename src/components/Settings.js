@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Settings as SettingsIcon, 
   Package, 
-  User, 
-  Database, 
-  Bell, 
-  Shield, 
   Zap, 
   Plus, 
   Edit, 
@@ -13,8 +8,7 @@ import {
   Save, 
   X,
   Search,
-  Download,
-  Upload,
+  Database,
   Trash2 as TrashIcon
 } from 'lucide-react';
 import { FirebaseService } from '../services/firebaseService';
@@ -26,16 +20,9 @@ import BasePage from './BasePage';
 const Settings = () => {
   const { showNotification } = useNotification();
   const { materials } = useMaterials();
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('pv-configurator');
   const [pvSubTab, setPvSubTab] = useState('komponenten');
-  const [settings, setSettings] = useState({
-    companyName: 'Ihr Unternehmen',
-    userEmail: 'admin@example.com',
-    notifications: true,
-    autoBackup: true,
-    theme: 'light',
-    language: 'de'
-  });
+  const [settings, setSettings] = useState({});
   
   // PV Configurator Default Settings
   const [pvDefaults, setPvDefaults] = useState({
@@ -89,27 +76,6 @@ const Settings = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showIds, setShowIds] = useState(false);
 
-  const handleSettingChange = (key, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const handleSaveSettings = () => {
-    // Hier würden die Einstellungen gespeichert werden
-    console.log('Settings saved:', settings);
-  };
-
-  const handleExportData = () => {
-    // Hier würde der Datenexport implementiert werden
-    console.log('Export data');
-  };
-
-  const handleImportData = () => {
-    // Hier würde der Datenimport implementiert werden
-    console.log('Import data');
-  };
 
   // PV Configurator Functions
   const loadPvDefaults = async () => {
@@ -399,13 +365,8 @@ const Settings = () => {
   };
 
   const tabs = [
-    { id: 'general', name: 'Allgemein', icon: SettingsIcon },
     { id: 'pv-configurator', name: 'PV Konfigurator', icon: Zap },
-    { id: 'categories', name: 'Kategorien & Spezifikationen', icon: Package },
-    { id: 'user', name: 'Benutzer', icon: User },
-    { id: 'data', name: 'Daten', icon: Database },
-    { id: 'notifications', name: 'Benachrichtigungen', icon: Bell },
-    { id: 'security', name: 'Sicherheit', icon: Shield }
+    { id: 'categories', name: 'Kategorien & Spezifikationen', icon: Package }
   ];
 
   return (
@@ -2583,161 +2544,7 @@ const Settings = () => {
             </BasePage>
           )}
 
-          {activeTab === 'general' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Allgemeine Einstellungen</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Firmenname
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.companyName}
-                      onChange={(e) => handleSettingChange('companyName', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Sprache
-                    </label>
-                    <select
-                      value={settings.language}
-                      onChange={(e) => handleSettingChange('language', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    >
-                      <option value="de">Deutsch</option>
-                      <option value="en">English</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Design
-                    </label>
-                    <select
-                      value={settings.theme}
-                      onChange={(e) => handleSettingChange('theme', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    >
-                      <option value="light">Hell</option>
-                      <option value="dark">Dunkel</option>
-                      <option value="auto">Automatisch</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'user' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Benutzereinstellungen</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      E-Mail-Adresse
-                    </label>
-                    <input
-                      type="email"
-                      value={settings.userEmail}
-                      onChange={(e) => handleSettingChange('userEmail', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'data' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Datenverwaltung</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Automatisches Backup</h4>
-                      <p className="text-sm text-gray-500">Erstellt täglich automatische Backups Ihrer Daten</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.autoBackup}
-                        onChange={(e) => handleSettingChange('autoBackup', e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
-                  </div>
-
-
-                  {/* Category Field Cleanup Section */}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                      onClick={handleExportData}
-                      className="flex items-center justify-center space-x-2 p-4 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      <Download className="h-5 w-5 text-gray-600" />
-                      <span>Daten exportieren</span>
-                    </button>
-                    <button
-                      onClick={handleImportData}
-                      className="flex items-center justify-center space-x-2 p-4 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      <Upload className="h-5 w-5 text-gray-600" />
-                      <span>Daten importieren</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Benachrichtigungseinstellungen</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div>
-                      <h4 className="font-medium text-gray-900">Push-Benachrichtigungen</h4>
-                      <p className="text-sm text-gray-500">Erhalten Sie Benachrichtigungen über wichtige Ereignisse</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.notifications}
-                        onChange={(e) => handleSettingChange('notifications', e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'security' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Sicherheitseinstellungen</h3>
-                <div className="space-y-4">
-                  <div className="p-4 border border-gray-200 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-2">Passwort ändern</h4>
-                    <p className="text-sm text-gray-500 mb-4">Aktualisieren Sie Ihr Passwort regelmäßig für bessere Sicherheit</p>
-                    <button className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
-                      Passwort ändern
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
