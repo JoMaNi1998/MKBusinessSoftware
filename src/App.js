@@ -20,7 +20,6 @@ import PVConfigurator from './components/PVConfigurator';
 import Settings from './components/Settings';
 import UserAvatar from './components/UserAvatar';
 import Sidebar from './components/Sidebar';
-import AdminSetup from './components/AdminSetup';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
@@ -37,7 +36,6 @@ function App() {
                   <div className="min-h-dvh bg-gray-50">
                     <Routes>
                       <Route path="/login" element={<Login />} />
-                      <Route path="/admin-setup" element={<AdminSetup />} />
                       <Route 
                         path="/*" 
                         element={
