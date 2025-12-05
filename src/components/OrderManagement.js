@@ -1,36 +1,154 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Check, X, Package, AlertTriangle, Clock, Plus, Search, Shield } from 'lucide-react';
+import { ShoppingCart, Check, X, Package, AlertTriangle, Clock, Plus, Search, Shield, ExternalLink } from 'lucide-react';
 import { useMaterials } from '../context/MaterialContext';
 import { useNotification } from '../context/NotificationContext';
 import { FirebaseService } from '../services/firebaseService';
 
 const OrderManagement = () => {
-  const { materials } = useMaterials();
+  const { materials, updateMaterial } = useMaterials();
   const { showNotification } = useNotification();
   const [orderList, setOrderList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingOrderQty, setEditingOrderQty] = useState(null);
+  const [tempOrderQty, setTempOrderQty] = useState('');
 
-  // Materialien mit Status "niedrig" oder "bestellt" laden (ausgenommen: excludeFromAutoOrder)
+  // Materialien mit Status "niedrig", "nachbestellen" oder "bestellt" laden (ausgenommen: excludeFromAutoOrder bei positiven Beständen)
+  // Bei bereits bestellten Materialien mit zusätzlichem Bedarf: Separate Zeile für Nachbestellung
   useEffect(() => {
-    const lowStockMaterials = materials.filter(m => 
-      ((m.stock <= m.heatStock && m.stock > 0 && !m.excludeFromAutoOrder) || m.orderStatus === 'bestellt')
-    );
-    setOrderList(lowStockMaterials);
+    const result = [];
+
+    materials.forEach(m => {
+      const isOrdered = m.orderStatus === 'bestellt';
+      const orderedQty = m.orderedQuantity || 0;
+      const isNegative = m.stock < 0;
+      const needed = isNegative ? Math.abs(m.stock) : 0;
+      const additionalNeeded = isOrdered && isNegative ? needed - orderedQty : 0;
+
+      // Fall 1: Material ist bestellt - zeige bestellte Menge
+      if (isOrdered) {
+        result.push({
+          ...m,
+          _displayType: 'ordered',
+          _displayQuantity: orderedQty
+        });
+      }
+
+      // Fall 2: Material ist bestellt UND es wird mehr benötigt - neue Zeile für Nachbestellung
+      if (isOrdered && additionalNeeded > 0) {
+        result.push({
+          ...m,
+          _displayType: 'additional',
+          _displayQuantity: additionalNeeded,
+          _isAdditionalOrder: true
+        });
+      }
+
+      // Fall 3: Material ist NICHT bestellt, aber hat negativen Bestand
+      // excludeFromAutoOrder = true → absoluter Wert des Defizits anzeigen
+      // excludeFromAutoOrder = false → konfigurierte orderQuantity anzeigen
+      if (!isOrdered && isNegative) {
+        result.push({
+          ...m,
+          _displayType: 'needed',
+          _displayQuantity: m.excludeFromAutoOrder ? needed : (m.orderQuantity || needed)
+        });
+      }
+
+      // Fall 4: Niedriger Bestand (nicht negativ, nicht bestellt, nicht ausgeschlossen)
+      if (!isOrdered && !isNegative && m.stock <= (m.heatStock || 0) && m.stock > 0 && !m.excludeFromAutoOrder) {
+        result.push({
+          ...m,
+          _displayType: 'low',
+          _displayQuantity: m.orderQuantity || 0
+        });
+      }
+    });
+
+    setOrderList(result);
   }, [materials]);
 
-  // Material als bestellt markieren
-  const markAsOrdered = async (materialId) => {
+  // Inline-Bearbeitung für Bestellmenge
+  const handleOrderQtyEdit = (materialId, currentQty) => {
+    setEditingOrderQty(materialId);
+    setTempOrderQty(String(currentQty || ''));
+  };
+
+  const handleOrderQtyCancel = () => {
+    setEditingOrderQty(null);
+    setTempOrderQty('');
+  };
+
+  const handleOrderQtySave = async (materialId) => {
+    try {
+      const qtyString = String(tempOrderQty || '').trim();
+      if (qtyString === '') {
+        setEditingOrderQty(null);
+        setTempOrderQty('');
+        return;
+      }
+
+      const qtyValue = parseInt(qtyString, 10);
+      if (isNaN(qtyValue) || qtyValue < 0) {
+        showNotification('Bitte geben Sie eine gültige Menge ein', 'error');
+        return;
+      }
+
+      const material = materials.find(m => m.id === materialId);
+      if (material) {
+        await updateMaterial({
+          ...material,
+          orderQuantity: qtyValue
+        });
+        showNotification('Bestellmenge erfolgreich aktualisiert', 'success');
+      } else {
+        showNotification('Material nicht gefunden', 'error');
+        return;
+      }
+
+      setEditingOrderQty(null);
+      setTempOrderQty('');
+    } catch (error) {
+      console.error('Fehler beim Speichern der Bestellmenge:', error);
+      showNotification('Fehler beim Aktualisieren der Bestellmenge', 'error');
+    }
+  };
+
+  // Material als bestellt markieren (mit bestellter Menge)
+  // Wenn isAdditional=true, wird die zusätzliche Menge zur bestehenden Bestellung hinzugefügt
+  const markAsOrdered = async (materialId, isAdditional = false, additionalQty = 0) => {
     setIsLoading(true);
     try {
-      await FirebaseService.updateDocument('materials', materialId, {
-        orderStatus: 'bestellt',
-        orderDate: new Date(),
-        updatedAt: new Date()
-      });
-      
-      showNotification('Material als bestellt markiert', 'success');
+      const material = materials.find(m => m.id === materialId);
+
+      if (isAdditional) {
+        // Zusätzliche Bestellung: Erhöhe orderedQuantity
+        const currentOrdered = material?.orderedQuantity || 0;
+        const newTotal = currentOrdered + additionalQty;
+
+        await FirebaseService.updateDocument('materials', materialId, {
+          orderedQuantity: newTotal,
+          orderDate: new Date(),
+          updatedAt: new Date()
+        });
+
+        showNotification(`+${additionalQty} Stück nachbestellt (gesamt: ${newTotal})`, 'success');
+      } else {
+        // excludeFromAutoOrder = true → Defizit, sonst orderQuantity
+        const orderedQty = material?.excludeFromAutoOrder
+          ? Math.abs(material?.stock || 0)
+          : (material?.orderQuantity || 0);
+
+        await FirebaseService.updateDocument('materials', materialId, {
+          orderStatus: 'bestellt',
+          orderDate: new Date(),
+          orderedQuantity: orderedQty,
+          updatedAt: new Date()
+        });
+
+        showNotification(`${orderedQty} Stück als bestellt markiert`, 'success');
+      }
     } catch (error) {
       console.error('Fehler beim Markieren als bestellt:', error);
       showNotification('Fehler beim Aktualisieren', 'error');
@@ -46,9 +164,10 @@ const OrderManagement = () => {
       await FirebaseService.updateDocument('materials', materialId, {
         orderStatus: null,
         orderDate: null,
+        orderedQuantity: null,
         updatedAt: new Date()
       });
-      
+
       showNotification('Bestellung storniert', 'success');
     } catch (error) {
       console.error('Fehler beim Stornieren:', error);
@@ -58,10 +177,15 @@ const OrderManagement = () => {
     }
   };
 
-  // Alle niedrigen Materialien auf einmal bestellen (ausgenommen: excludeFromAutoOrder)
+  // Alle niedrigen/negativen Materialien auf einmal bestellen (ausgenommen: excludeFromAutoOrder bei positiven Beständen)
   const orderAllLowStock = async () => {
-    const lowStockMaterials = materials.filter(m => 
-      m.stock <= m.heatStock && m.stock > 0 && m.orderStatus !== 'bestellt' && !m.excludeFromAutoOrder
+    const lowStockMaterials = materials.filter(m =>
+      m.orderStatus !== 'bestellt' && (
+        // Negativer Bestand = immer einschließen
+        m.stock < 0 ||
+        // Niedriger Bestand und nicht ausgeschlossen
+        (m.stock <= (m.heatStock || 0) && m.stock > 0 && !m.excludeFromAutoOrder)
+      )
     );
 
     if (lowStockMaterials.length === 0) {
@@ -71,13 +195,18 @@ const OrderManagement = () => {
 
     setIsLoading(true);
     try {
-      const updatePromises = lowStockMaterials.map(material =>
-        FirebaseService.updateDocument('materials', material.id, {
+      const updatePromises = lowStockMaterials.map(material => {
+        // excludeFromAutoOrder = true → Defizit, sonst orderQuantity
+        const orderedQty = material.excludeFromAutoOrder
+          ? Math.abs(material.stock || 0)
+          : (material.orderQuantity || 0);
+        return FirebaseService.updateDocument('materials', material.id, {
           orderStatus: 'bestellt',
           orderDate: new Date(),
+          orderedQuantity: orderedQty,
           updatedAt: new Date()
-        })
-      );
+        });
+      });
 
       await Promise.all(updatePromises);
       showNotification(`${lowStockMaterials.length} Materialien als bestellt markiert`, 'success');
@@ -90,28 +219,55 @@ const OrderManagement = () => {
   };
 
   const getStatusColor = (material) => {
-    if (material.orderStatus === 'bestellt') return 'bg-blue-100 text-blue-800';
-    if (material.stock <= material.heatStock) return 'bg-orange-100 text-orange-800';
-    return 'bg-green-100 text-green-800';
+    // Verwende _displayType für die Anzeige
+    switch (material._displayType) {
+      case 'ordered':
+        return 'bg-blue-100 text-blue-800';
+      case 'additional':
+        return 'bg-red-100 text-red-800';
+      case 'needed':
+        return 'bg-red-100 text-red-800';
+      case 'low':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const getStatusText = (material) => {
-    if (material.orderStatus === 'bestellt') return 'Bestellt';
-    if (material.stock <= material.heatStock) return 'Niedrig';
-    return 'Auf Lager';
+    // Verwende _displayType für die Anzeige
+    switch (material._displayType) {
+      case 'ordered':
+        return `Bestellt (${material._displayQuantity})`;
+      case 'additional':
+        return `Nachbestellen (${material._displayQuantity})`;
+      case 'needed':
+        return `Nachbestellen (${material._displayQuantity})`;
+      case 'low':
+        return 'Niedrig';
+      default:
+        return 'Auf Lager';
+    }
   };
 
   // Material manuell zur Bestellung hinzufügen
   const addMaterialToOrder = async (materialId) => {
     setIsLoading(true);
     try {
+      const material = materials.find(m => m.id === materialId);
+      // excludeFromAutoOrder = true → Defizit, sonst orderQuantity
+      const orderedQty = material?.excludeFromAutoOrder
+        ? Math.abs(material?.stock || 0)
+        : (material?.orderQuantity || 0);
+
       await FirebaseService.updateDocument('materials', materialId, {
         orderStatus: 'bestellt',
         orderDate: new Date(),
+        orderedQuantity: orderedQty,
         updatedAt: new Date()
       });
-      
-      showNotification('Material zur Bestellung hinzugefügt', 'success');
+
+      showNotification(`Material zur Bestellung hinzugefügt (${orderedQty} Stück)`, 'success');
       setShowAddModal(false);
       setSearchTerm('');
     } catch (error) {
@@ -131,13 +287,13 @@ const OrderManagement = () => {
      m.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const lowStockCount = materials.filter(m => m.stock <= m.heatStock && m.stock > 0 && m.orderStatus !== 'bestellt' && !m.excludeFromAutoOrder).length;
+  const lowStockCount = materials.filter(m => m.stock <= (m.heatStock || 0) && m.stock > 0 && m.orderStatus !== 'bestellt' && !m.excludeFromAutoOrder).length;
   const orderedCount = materials.filter(m => m.orderStatus === 'bestellt').length;
-  const excludedLowStockCount = materials.filter(m => m.stock <= m.heatStock && m.stock > 0 && m.excludeFromAutoOrder && m.orderStatus !== 'bestellt').length;
-  
+  const excludedLowStockCount = materials.filter(m => m.stock <= (m.heatStock || 0) && m.stock > 0 && m.excludeFromAutoOrder && m.orderStatus !== 'bestellt').length;
+
   // Ausgeschlossene Materialien mit niedrigem Bestand
-  const excludedLowStockMaterials = materials.filter(m => 
-    m.stock <= m.heatStock && m.stock > 0 && m.excludeFromAutoOrder && m.orderStatus !== 'bestellt'
+  const excludedLowStockMaterials = materials.filter(m =>
+    m.stock <= (m.heatStock || 0) && m.stock > 0 && m.excludeFromAutoOrder && m.orderStatus !== 'bestellt'
   );
 
   return (
@@ -239,6 +395,9 @@ const OrderManagement = () => {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Link
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Aktionen
                   </th>
                 </tr>
@@ -248,44 +407,82 @@ const OrderManagement = () => {
                   <tr key={material.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900 flex items-center space-x-2">
-                          <span>{material.materialID}</span>
-                          {material.excludeFromAutoOrder && (
-                            <Shield className="h-4 w-4 text-amber-500" title="Von automatischer Nachbestellung ausgeschlossen" />
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm font-medium text-gray-900">
                           {material.description}
                         </div>
-                        {material.excludeFromAutoOrder && (
-                          <div className="text-xs text-amber-600 mt-1">
-                            Manuelle Bestellung erforderlich
-                          </div>
-                        )}
+                        <div className="text-sm text-gray-500">
+                          {material.materialID}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {material.stock} {material.unit}
+                        {material.stock}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {material.heatStock} {material.unit}
+                        {material.heatStock}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {material.orderQuantity || (material.heatStock * 2)} {material.unit}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      {editingOrderQty === material.id ? (
+                        <div className="relative z-50">
+                          <input
+                            type="number"
+                            value={tempOrderQty}
+                            onChange={(e) => setTempOrderQty(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleOrderQtySave(material.id);
+                              } else if (e.key === 'Escape') {
+                                handleOrderQtyCancel();
+                              }
+                            }}
+                            onBlur={() => handleOrderQtySave(material.id)}
+                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            placeholder="0"
+                            min="0"
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className="cursor-pointer hover:bg-blue-50 hover:border hover:border-blue-200 px-2 py-1 rounded transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOrderQtyEdit(material.id, material.orderQuantity);
+                          }}
+                          title="Klicken zum Bearbeiten der Bestellmenge"
+                        >
+                          <span className="text-sm font-medium text-gray-900 hover:text-blue-700">
+                            {material._displayQuantity}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(material)}`}>
                         {getStatusText(material)}
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {material.link ? (
+                        <a
+                          href={material.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:text-primary-800"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="h-5 w-5" />
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      {material.orderStatus === 'bestellt' ? (
+                      {material._displayType === 'ordered' ? (
                         <button
                           onClick={() => cancelOrder(material.id)}
                           disabled={isLoading}
@@ -293,6 +490,15 @@ const OrderManagement = () => {
                         >
                           <X className="h-4 w-4" />
                           <span>Stornieren</span>
+                        </button>
+                      ) : material._displayType === 'additional' ? (
+                        <button
+                          onClick={() => markAsOrdered(material.id, true, material._displayQuantity)}
+                          disabled={isLoading}
+                          className="text-blue-600 hover:text-blue-900 disabled:opacity-50 flex items-center space-x-1"
+                        >
+                          <Check className="h-4 w-4" />
+                          <span>Nachbestellen</span>
                         </button>
                       ) : (
                         <button
@@ -345,6 +551,9 @@ const OrderManagement = () => {
                     Preis
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Link
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Aktionen
                   </th>
                 </tr>
@@ -354,32 +563,43 @@ const OrderManagement = () => {
                   <tr key={material.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900 flex items-center space-x-2">
-                          <span>{material.materialID}</span>
-                          <Shield className="h-4 w-4 text-amber-500" />
-                        </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm font-medium text-gray-900">
                           {material.description}
                         </div>
-                        <div className="text-xs text-amber-600 mt-1">
-                          Manuelle Bestellung erforderlich
+                        <div className="text-sm text-gray-500">
+                          {material.materialID}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-red-600 font-medium">
-                        {material.stock} {material.unit}
+                        {material.stock}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {material.heatStock} {material.unit}
+                        {material.heatStock}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
                         {material.price ? `${material.price} €` : 'Nicht angegeben'}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {material.link ? (
+                        <a
+                          href={material.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:text-primary-800"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ExternalLink className="h-5 w-5" />
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
@@ -447,7 +667,7 @@ const OrderManagement = () => {
                       <div className="font-medium text-gray-900">{material.materialID}</div>
                       <div className="text-sm text-gray-500">{material.description}</div>
                       <div className="text-xs text-gray-400">
-                        {material.manufacturer} • Bestand: {material.stock} {material.unit}
+                        {material.manufacturer} • Bestand: {material.stock}
                       </div>
                     </div>
                     <button

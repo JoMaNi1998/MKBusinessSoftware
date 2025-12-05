@@ -219,9 +219,11 @@ export const MaterialProvider = ({ children }) => {
       const material = materials.find(m => m.id === materialId);
       if (!material) return;
 
-      const newStock = Math.max(0, material.stock + change);
-      const stockState = newStock === 0 ? 'Nicht verfügbar' : 
-                        newStock <= material.heatStock * 0.2 ? 'Niedrig' : 'Auf Lager';
+      const newStock = material.stock + change;
+      // Negativer Bestand = Nachbestellen, 0 = Nicht verfügbar, niedrig (≤ heatStock) oder auf Lager
+      const stockState = newStock < 0 ? 'Nachbestellen' :
+                        newStock === 0 ? 'Nicht verfügbar' :
+                        newStock <= material.heatStock ? 'Niedrig' : 'Auf Lager';
 
       await MaterialService.updateMaterial(materialId, {
         ...material,
@@ -237,24 +239,6 @@ export const MaterialProvider = ({ children }) => {
 
   // Alias für updateStock für Kompatibilität mit BookingModal
   const updateMaterialStock = updateStock;
-
-  const getMaterialById = (id) => {
-    return materials.find(material => material.id === id);
-  };
-
-  const getMaterialsByCategory = (category) => {
-    return materials.filter(material => material.category === category);
-  };
-
-  const getLowStockMaterials = () => {
-    return materials.filter(material => 
-      material.stock > 0 && material.stock <= material.heatStock * 0.2
-    );
-  };
-
-  const getOutOfStockMaterials = () => {
-    return materials.filter(material => material.stock === 0);
-  };
 
   const value = {
     materials,

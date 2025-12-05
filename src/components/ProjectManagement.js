@@ -21,8 +21,7 @@ import { useProjects } from '../context/ProjectContext';
 import { useCustomers } from '../context/CustomerContext';
 import { useNotification } from '../context/NotificationContext';
 import { FirebaseService } from '../services/firebaseService';
-import { AddProjectModal } from './ProjectDetailModal';
-import ProjectDetailModal from './ProjectDetailModal';
+import ProjectDetailModal, { AddProjectModal } from './ProjectDetailModal';
 
 const ProjectManagement = () => {
   const { projects, addProject, updateProject, deleteProject } = useProjects();

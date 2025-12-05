@@ -57,16 +57,6 @@ export const BookingProvider = ({ children }) => {
     }
   };
 
-  const updateBooking = (bookingId, bookingData) => {
-    setBookings(prev => 
-      prev.map(booking => 
-        booking.id === bookingId 
-          ? { ...booking, ...bookingData }
-          : booking
-      )
-    );
-  };
-
   const deleteBooking = async (bookingId) => {
     try {
       setLoading(true);
@@ -89,13 +79,15 @@ export const BookingProvider = ({ children }) => {
           // Hole aktuelles Material aus Firebase
           const currentMaterial = await MaterialService.getDocument(material.materialID);
           if (currentMaterial) {
-            const stockChange = booking.type === 'Eingang' 
+            const stockChange = booking.type === 'Eingang'
               ? -material.quantity  // Bei Eingang: Bestand reduzieren
               : material.quantity;   // Bei Ausgang: Bestand erhöhen
-            
-            const newStock = Math.max(0, currentMaterial.stock + stockChange);
-            const stockState = newStock === 0 ? 'Nicht verfügbar' : 
-                              newStock <= currentMaterial.heatStock * 0.2 ? 'Niedrig' : 'Auf Lager';
+
+            const newStock = currentMaterial.stock + stockChange;
+            // Negativer Bestand = Nachbestellen, 0 = Nicht verfügbar, niedrig (≤ heatStock) oder auf Lager
+            const stockState = newStock < 0 ? 'Nachbestellen' :
+                              newStock === 0 ? 'Nicht verfügbar' :
+                              newStock <= currentMaterial.heatStock ? 'Niedrig' : 'Auf Lager';
             
             await MaterialService.updateMaterial(material.materialID, {
               ...currentMaterial,

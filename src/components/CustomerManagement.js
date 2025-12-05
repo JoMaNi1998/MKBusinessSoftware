@@ -17,10 +17,8 @@ import { useCustomers } from '../context/CustomerContext';
 import { useProjects } from '../context/ProjectContext';
 import { useNotification } from '../context/NotificationContext';
 import { FirebaseService } from '../services/firebaseService';
-import { AddCustomerModal } from './CustomerDetailModal';
-import CustomerDetailModal from './CustomerDetailModal';
-import ProjectDetailModal from './ProjectDetailModal';
-import { AddProjectModal } from './ProjectDetailModal';
+import CustomerDetailModal, { AddCustomerModal } from './CustomerDetailModal';
+import ProjectDetailModal, { AddProjectModal } from './ProjectDetailModal';
 
 const CustomerManagement = () => {
   const { customers, deleteCustomer } = useCustomers();

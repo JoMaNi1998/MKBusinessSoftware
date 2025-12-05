@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Package, 
   Zap, 
   Plus, 
   Edit, 
-  Trash2, 
-  Save, 
+  Trash2,
+  Save,
   X,
   Search,
   Database,
-  Trash2 as TrashIcon,
   Users,
   Shield,
   UserPlus,
@@ -85,7 +84,12 @@ const Settings = () => {
     // ErdungStaberder Standardkomponente
     defaultErdungStaberder: 'Kein Standard',
   });
-  
+
+  // Autosave für PV-Defaults
+  const pvDefaultsTimerRef = useRef(null);
+  const pvDefaultsLoadedRef = useRef(false);
+  const [pvDefaultsSaving, setPvDefaultsSaving] = useState(false);
+
   // Kategorie- und Spezifikations-Management
   const [categories, setCategories] = useState([]);
   const [specifications, setSpecifications] = useState({});
@@ -105,6 +109,10 @@ const Settings = () => {
       if (defaultsData && defaultsData.length > 0) {
         setPvDefaults(defaultsData[0]);
       }
+      // Markiere als geladen, damit Autosave aktiviert wird
+      setTimeout(() => {
+        pvDefaultsLoadedRef.current = true;
+      }, 500);
     } catch (error) {
       console.error('Fehler beim Laden der PV-Standardeinstellungen:', error);
     }
@@ -141,6 +149,42 @@ const Settings = () => {
     loadPvDefaults();
     loadUsers();
   }, []);
+
+  // Autosave für PV-Defaults (2 Sekunden Verzögerung)
+  useEffect(() => {
+    // Nicht speichern wenn noch nicht geladen oder beim initialen Laden
+    if (!pvDefaultsLoadedRef.current) return;
+
+    // Vorherigen Timer abbrechen
+    if (pvDefaultsTimerRef.current) {
+      clearTimeout(pvDefaultsTimerRef.current);
+    }
+
+    // Neuen Timer setzen
+    pvDefaultsTimerRef.current = setTimeout(async () => {
+      try {
+        setPvDefaultsSaving(true);
+        const existingDefaults = await FirebaseService.getDocuments('pv-defaults');
+
+        if (existingDefaults && existingDefaults.length > 0) {
+          await FirebaseService.updateDocument('pv-defaults', existingDefaults[0].id, pvDefaults);
+        } else {
+          await FirebaseService.addDocument('pv-defaults', pvDefaults);
+        }
+      } catch (error) {
+        console.error('Fehler beim Auto-Speichern der PV-Standardeinstellungen:', error);
+      } finally {
+        setPvDefaultsSaving(false);
+      }
+    }, 2000);
+
+    // Cleanup bei Unmount
+    return () => {
+      if (pvDefaultsTimerRef.current) {
+        clearTimeout(pvDefaultsTimerRef.current);
+      }
+    };
+  }, [pvDefaults]);
 
   // User Management Functions
   const loadUsers = async () => {
@@ -460,11 +504,28 @@ const Settings = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Einstellungen</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Verwalten Sie Ihre Anwendungseinstellungen und Präferenzen
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Einstellungen</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Verwalten Sie Ihre Anwendungseinstellungen und Präferenzen
+          </p>
+        </div>
+        {activeTab === 'pv-configurator' && (
+          <div className="flex items-center space-x-2 text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+            {pvDefaultsSaving ? (
+              <>
+                <Loader className="h-4 w-4 animate-spin text-primary-600" />
+                <span>Speichert...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span>Autosave aktiv</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -2571,15 +2632,6 @@ const Settings = () => {
                   </div>
                 )}
 
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={handleSavePvDefaults}
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center space-x-2"
-                  >
-                    <Save className="h-4 w-4" />
-                    <span>PV-Standardeinstellungen speichern</span>
-                  </button>
-                </div>
               </div>
             </div>
           )}

@@ -188,7 +188,7 @@ const LabeledNumber = ({ label, value, onChange, min = 0, hasError = false }) =>
  *  Hauptkomponente
  * ------------------------------------------- */
 const PVConfigurator = () => {
-  const { materials } = useMaterials();
+  const { materials, updateMaterialStock } = useMaterials();
   const { customers } = useCustomers();
   const { projects } = useProjects();
   const { addBooking } = useBookings();
@@ -1664,6 +1664,15 @@ const PVConfigurator = () => {
       const configId = `pv-config-${selectedProject}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
       await addBooking(bookingData);
+
+      // Bestände für alle Materialien in der BOM aktualisieren (Ausgang = negativ)
+      for (const item of calculatedBOM) {
+        const material = materials.find(m => m.materialID === item.materialID || m.id === item.materialID);
+        if (material) {
+          await updateMaterialStock(material.id, -item.quantity);
+        }
+      }
+
       await FirebaseService.addDocument('project-configurations', {
         id: configId,
         projectID: selectedProject,

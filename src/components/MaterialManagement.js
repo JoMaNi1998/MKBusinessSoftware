@@ -96,6 +96,7 @@ const MaterialManagement = () => {
   ];
 
   const getStockStatusColor = (stock, heatStock, orderStatus) => {
+    if (stock < 0) return 'text-red-700 bg-red-100';
     if (stock === 0) return 'text-red-600 bg-red-50';
     if (orderStatus === 'bestellt') return 'text-blue-600 bg-blue-50';
     if (stock <= heatStock) return 'text-orange-600 bg-orange-50';
@@ -103,6 +104,7 @@ const MaterialManagement = () => {
   };
 
   const getStockStatusText = (stock, heatStock, orderStatus) => {
+    if (stock < 0) return `Nachbestellen (${Math.abs(stock)})`;
     if (stock === 0) return 'Nicht verfügbar';
     if (orderStatus === 'bestellt') return 'Bestellt';
     if (stock <= heatStock) return 'Niedrig';
@@ -383,7 +385,7 @@ const MaterialManagement = () => {
 
   const formatPrice = (price) => {
     if (price === null || price === undefined || price === '') return '';
-    return `${Number(price).toFixed(2).replace('.', ',')} €`;
+    return `${Number(price).toFixed(2).replace('.', ',')}`;
   };
 
 

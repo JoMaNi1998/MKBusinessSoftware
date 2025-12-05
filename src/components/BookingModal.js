@@ -7,6 +7,9 @@ import { useNotification } from '../context/NotificationContext';
 import { useBookings } from '../context/BookingContext';
 import BaseModal from './BaseModal';
 
+// Konstante für Lagerbuchung (Wareneingang ohne Kunde)
+const WAREHOUSE_BOOKING = 'Lagerbuchung';
+
 const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
   const { materials, updateMaterialStock } = useMaterials();
   const { customers } = useCustomers();
@@ -45,7 +48,7 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
       newErrors.customer = 'Bitte wählen Sie einen Kunden aus';
     }
     
-    if (!selectedProject && selectedCustomer !== 'Lagerbuchung') {
+    if (!selectedProject && selectedCustomer !== WAREHOUSE_BOOKING) {
       newErrors.project = 'Bitte wählen Sie ein Projekt aus';
     }
     
@@ -75,26 +78,43 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
     }
 
     // Führe Buchung durch
-    for (const item of selectedMaterials) {
-      const stockChange = type === 'Eingang' ? item.quantity : -item.quantity;
-      await updateMaterialStock(item.materialId, stockChange);
-      
-      // Bei Wareneingang: Bestellstatus zurücksetzen falls Material bestellt war
-      if (type === 'Eingang') {
-        const material = materials.find(m => m.id === item.materialId);
-        if (material && material.orderStatus === 'bestellt') {
-          try {
-            const { FirebaseService } = await import('../services/firebaseService');
-            await FirebaseService.updateDocument('materials', item.materialId, {
-              orderStatus: null,
-              orderDate: null,
-              updatedAt: new Date()
-            });
-          } catch (error) {
-            console.error('Fehler beim Zurücksetzen des Bestellstatus:', error);
+    const successfulUpdates = [];
+    try {
+      for (const item of selectedMaterials) {
+        const stockChange = type === 'Eingang' ? item.quantity : -item.quantity;
+        await updateMaterialStock(item.materialId, stockChange);
+        successfulUpdates.push({ materialId: item.materialId, stockChange });
+
+        // Bei Wareneingang: Bestellstatus zurücksetzen falls Material bestellt war
+        if (type === 'Eingang') {
+          const material = materials.find(m => m.id === item.materialId);
+          if (material && material.orderStatus === 'bestellt') {
+            try {
+              const { FirebaseService } = await import('../services/firebaseService');
+              await FirebaseService.updateDocument('materials', item.materialId, {
+                orderStatus: null,
+                orderDate: null,
+                orderedQuantity: 0,
+                updatedAt: new Date()
+              });
+            } catch (error) {
+              console.error('Fehler beim Zurücksetzen des Bestellstatus:', error);
+            }
           }
         }
       }
+    } catch (error) {
+      // Rollback bei Fehler: Alle erfolgreichen Updates rückgängig machen
+      console.error('Fehler bei Buchung, führe Rollback durch:', error);
+      for (const update of successfulUpdates) {
+        try {
+          await updateMaterialStock(update.materialId, -update.stockChange);
+        } catch (rollbackError) {
+          console.error('Rollback fehlgeschlagen für Material:', update.materialId, rollbackError);
+        }
+      }
+      showNotification('Buchung fehlgeschlagen. Änderungen wurden rückgängig gemacht.', 'error');
+      return;
     }
 
     // Speichere Buchung in der Historie
@@ -107,7 +127,7 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
     const booking = {
       id: bookingId,
       customerID: selectedCustomer,
-      customerName: selectedCustomerData?.firmennameKundenname || (selectedCustomer === 'Lagerbuchung' ? 'Wareneingang' : selectedCustomer),
+      customerName: selectedCustomerData?.firmennameKundenname || (selectedCustomer === WAREHOUSE_BOOKING ? 'Wareneingang' : selectedCustomer),
       projectID: selectedProject,
       projectName: selectedProjectData?.name || '',
       type,
@@ -222,7 +242,7 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
                   {type === 'Eingang' ? 'Lieferant auswählen...' : 'Kunde auswählen...'}
                 </option>
                 {type === 'Eingang' && (
-                  <option value="Lagerbuchung">Wareneingang (Lager)</option>
+                  <option value={WAREHOUSE_BOOKING}>Wareneingang (Lager)</option>
                 )}
                 {customers.map(customer => (
                   <option key={customer.id} value={customer.customerID}>
@@ -266,7 +286,7 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
           )}
 
           {/* Hinweis wenn keine Projekte vorhanden */}
-          {selectedCustomer && selectedCustomer !== 'Lagerbuchung' && customerProjects.length === 0 && (
+          {selectedCustomer && selectedCustomer !== WAREHOUSE_BOOKING && customerProjects.length === 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex">
                 <div className="text-yellow-800">
@@ -309,7 +329,7 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
                       {material.description}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {material.materialID} | Lager: {material.currentStock} {material.unit}
+                      {material.materialID} | Lager: {material.stock} {material.unit}
                     </div>
                   </div>
                   <button
