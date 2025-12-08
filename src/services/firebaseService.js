@@ -44,7 +44,11 @@ export const COLLECTIONS = {
   MATERIALS: 'materials',
   CUSTOMERS: 'customers',
   BOOKINGS: 'bookings',
-  PROJECTS: 'projects'
+  PROJECTS: 'projects',
+  CALCULATION_SETTINGS: 'calculation-settings',
+  SERVICE_CATALOG: 'service-catalog',
+  OFFERS: 'offers',
+  OFFER_TEMPLATES: 'offer-templates'
 };
 
 // Generic CRUD Operations
@@ -295,5 +299,148 @@ export class ProjectService {
 
   static async getDocument(projectId) {
     return FirebaseService.getDocument(COLLECTIONS.PROJECTS, projectId);
+  }
+}
+
+// Calculation Settings Service
+export class CalculationSettingsService {
+  static async getSettings() {
+    try {
+      const settings = await FirebaseService.getDocument(COLLECTIONS.CALCULATION_SETTINGS, 'default');
+      return settings;
+    } catch (error) {
+      console.error('Error getting calculation settings:', error);
+      return null;
+    }
+  }
+
+  static async saveSettings(settingsData) {
+    try {
+      const existingSettings = await this.getSettings();
+      if (existingSettings) {
+        await FirebaseService.updateDocument(COLLECTIONS.CALCULATION_SETTINGS, 'default', settingsData);
+      } else {
+        await setDoc(doc(db, COLLECTIONS.CALCULATION_SETTINGS, 'default'), {
+          ...settingsData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving calculation settings:', error);
+      throw error;
+    }
+  }
+
+  static subscribeToSettings(callback) {
+    const docRef = doc(db, COLLECTIONS.CALCULATION_SETTINGS, 'default');
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        callback({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        callback(null);
+      }
+    });
+  }
+}
+
+// Service Catalog Service (Leistungskatalog)
+export class ServiceCatalogService {
+  static async getAllServices() {
+    return FirebaseService.getDocuments(COLLECTIONS.SERVICE_CATALOG, 'sortOrder');
+  }
+
+  static async getService(serviceId) {
+    return FirebaseService.getDocument(COLLECTIONS.SERVICE_CATALOG, serviceId);
+  }
+
+  static async addService(serviceData) {
+    return FirebaseService.addDocument(COLLECTIONS.SERVICE_CATALOG, serviceData);
+  }
+
+  static async updateService(serviceId, serviceData) {
+    return FirebaseService.updateDocument(COLLECTIONS.SERVICE_CATALOG, serviceId, serviceData);
+  }
+
+  static async deleteService(serviceId) {
+    return FirebaseService.deleteDocument(COLLECTIONS.SERVICE_CATALOG, serviceId);
+  }
+
+  static subscribeToServices(callback) {
+    // Einfache Query ohne composite index (sortiert nur nach sortOrder)
+    return FirebaseService.subscribeToCollection(COLLECTIONS.SERVICE_CATALOG, callback, 'sortOrder');
+  }
+
+  static async getServicesByCategory(category) {
+    return FirebaseService.queryDocuments(COLLECTIONS.SERVICE_CATALOG, 'category', '==', category);
+  }
+}
+
+// Offer Service (Angebote)
+export class OfferService {
+  static async getAllOffers() {
+    return FirebaseService.getDocuments(COLLECTIONS.OFFERS, 'createdAt');
+  }
+
+  static async getOffer(offerId) {
+    return FirebaseService.getDocument(COLLECTIONS.OFFERS, offerId);
+  }
+
+  static async addOffer(offerData) {
+    return FirebaseService.addDocument(COLLECTIONS.OFFERS, offerData);
+  }
+
+  static async updateOffer(offerId, offerData) {
+    return FirebaseService.updateDocument(COLLECTIONS.OFFERS, offerId, offerData);
+  }
+
+  static async deleteOffer(offerId) {
+    return FirebaseService.deleteDocument(COLLECTIONS.OFFERS, offerId);
+  }
+
+  static subscribeToOffers(callback) {
+    return FirebaseService.subscribeToCollection(COLLECTIONS.OFFERS, callback, 'createdAt');
+  }
+
+  static async getOffersByCustomer(customerId) {
+    return FirebaseService.queryDocuments(COLLECTIONS.OFFERS, 'customerID', '==', customerId);
+  }
+
+  static async getOffersByProject(projectId) {
+    return FirebaseService.queryDocuments(COLLECTIONS.OFFERS, 'projectID', '==', projectId);
+  }
+
+  static async getOffersByStatus(status) {
+    return FirebaseService.queryDocuments(COLLECTIONS.OFFERS, 'status', '==', status);
+  }
+
+  static async getNextOfferNumber() {
+    try {
+      const currentYear = new Date().getFullYear();
+      const offers = await this.getAllOffers();
+
+      // Filter offers from current year and find highest number
+      const yearOffers = offers.filter(o => {
+        const offerYear = o.offerNumber?.match(/\d{4}/)?.[0];
+        return offerYear === String(currentYear);
+      });
+
+      let maxNumber = 0;
+      yearOffers.forEach(o => {
+        const match = o.offerNumber?.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNumber) maxNumber = num;
+        }
+      });
+
+      const nextNumber = String(maxNumber + 1).padStart(4, '0');
+      return `ANG-${currentYear}-${nextNumber}`;
+    } catch (error) {
+      console.error('Error generating offer number:', error);
+      const timestamp = Date.now();
+      return `ANG-${new Date().getFullYear()}-${timestamp}`;
+    }
   }
 }

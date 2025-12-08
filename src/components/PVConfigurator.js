@@ -251,6 +251,7 @@ const PVConfigurator = () => {
     generatoranschlusskastenQty: 0,
     spannungsversorgungAPZ: '',
     spannungsversorgungAPZQty: 0,
+
   });
 
   /* ---------------- State: Defaults / Settings aus Firebase (bestehend) ---------------- */
@@ -718,11 +719,12 @@ const PVConfigurator = () => {
 
     // 1. Module
     if (configuration.module) {
-      bom.push({ 
-        materialID: configuration.module, 
-        quantity: totalModules, 
-        description: materialsById.get(configuration.module)?.description || 'PV-Module', 
-        category: 'Module' 
+      bom.push({
+        materialID: configuration.module,
+        quantity: totalModules,
+        description: materialsById.get(configuration.module)?.description || 'PV-Module',
+        category: 'Module',
+        isConfigured: true
       });
     }
 
@@ -735,6 +737,7 @@ const PVConfigurator = () => {
           quantity: inv.quantity,
           description: materialsById.get(inv.type)?.description || `Wechselrichter ${idx + 1}`,
           category: 'Wechselrichter',
+          isConfigured: true,
         });
       }
       (inv.strings || []).forEach((s) => (totalModulesInStrings += (parseInt(s.modules) || 0)));
@@ -755,6 +758,7 @@ const PVConfigurator = () => {
           quantity: mountingCount,
           description: materialsById.get(configuration.pvMountingSystem)?.description || 'PV-Montagesystem',
           category: 'Montagesystem',
+          isConfigured: true,
         });
       }
       if (configuration.befestigungPVMountingSystem && mountingCount > 0) {
@@ -763,6 +767,7 @@ const PVConfigurator = () => {
           quantity: mountingCount * 2,
           description: materialsById.get(configuration.befestigungPVMountingSystem)?.description || 'Befestigung',
           category: 'Befestigung',
+          isConfigured: true,
         });
       }
 
@@ -771,11 +776,12 @@ const PVConfigurator = () => {
       const midClampQty = (totalModules - totalRows) * 2;
 
       if (configuration.modulEndklemmen && endClampQty > 0) {
-        bom.push({ 
-          materialID: configuration.modulEndklemmen, 
-          quantity: endClampQty, 
-          description: materialsById.get(configuration.modulEndklemmen)?.description || 'Modul-Endklemmen', 
-          category: 'Klemmen' 
+        bom.push({
+          materialID: configuration.modulEndklemmen,
+          quantity: endClampQty,
+          description: materialsById.get(configuration.modulEndklemmen)?.description || 'Modul-Endklemmen',
+          category: 'Klemmen',
+          isConfigured: true,
         });
       }
       if (configuration.modulMittelklemmen && midClampQty > 0) {
@@ -784,6 +790,7 @@ const PVConfigurator = () => {
           quantity: midClampQty,
           description: materialsById.get(configuration.modulMittelklemmen)?.description || 'Modul-Mittelklemmen',
           category: 'Klemmen',
+          isConfigured: true,
         });
       }
 

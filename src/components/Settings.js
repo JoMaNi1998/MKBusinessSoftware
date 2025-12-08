@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  Package, 
-  Zap, 
-  Plus, 
-  Edit, 
+import {
+  Package,
+  Zap,
+  Plus,
+  Edit,
   Trash2,
   Save,
   X,
@@ -15,7 +15,9 @@ import {
   Mail,
   CheckCircle,
   AlertCircle,
-  Loader
+  Loader,
+  Calculator,
+  FileSpreadsheet
 } from 'lucide-react';
 import { FirebaseService } from '../services/firebaseService';
 import { useNotification } from '../context/NotificationContext';
@@ -26,6 +28,8 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
 import BaseModal from './BaseModal';
 import BasePage from './BasePage';
+import CalculationSettings from './offers/CalculationSettings';
+import ServiceCatalog from './offers/ServiceCatalog';
 
 const Settings = () => {
   const { showNotification } = useNotification();
@@ -497,7 +501,9 @@ const Settings = () => {
 
   const tabs = [
     { id: 'users', name: 'Benutzerverwaltung', icon: Users },
-    { id: 'pv-configurator', name: 'PV Konfiguratore', icon: Zap },
+    { id: 'pv-configurator', name: 'PV Konfigurator', icon: Zap },
+    { id: 'kalkulation', name: 'Kalkulation', icon: Calculator },
+    { id: 'leistungskatalog', name: 'Leistungskatalog', icon: FileSpreadsheet },
     { id: 'categories', name: 'Kategorien & Spezifikationen', icon: Package }
   ];
 
@@ -2634,6 +2640,14 @@ const Settings = () => {
 
               </div>
             </div>
+          )}
+
+          {activeTab === 'kalkulation' && (
+            <CalculationSettings />
+          )}
+
+          {activeTab === 'leistungskatalog' && (
+            <ServiceCatalog />
           )}
 
           {activeTab === 'categories' && (

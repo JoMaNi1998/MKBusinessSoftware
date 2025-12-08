@@ -1,16 +1,17 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Package, 
-  Users, 
-  Building, 
-  History, 
-  FileText, 
-  Settings, 
+import {
+  Package,
+  Users,
+  Building,
+  History,
+  FileText,
+  Settings,
   Home,
   Menu,
   X,
-  ShoppingCart
+  ShoppingCart,
+  FileSpreadsheet
 } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import { useRoleSafe } from '../context/RoleContext';
@@ -27,6 +28,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { name: 'Stückliste', href: '/bill-of-materials', icon: FileText, permission: 'materials' },
     { name: 'VDE Protokolle', href: '/vde-protocols', icon: FileText, permission: 'vde' },
     { name: 'PV Konfigurator', href: '/pv-configurator', icon: Home, permission: 'pv-configurator' },
+    { name: 'Angebote', href: '/offers', icon: FileSpreadsheet, permission: 'pv-configurator' },
     { name: 'Einstellungen', href: '/settings', icon: Settings, permission: 'settings' },
   ];
 
