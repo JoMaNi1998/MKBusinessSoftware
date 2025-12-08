@@ -14,14 +14,23 @@ export const useServiceCatalog = () => {
 };
 
 // Kategorien für Leistungspositionen
+// isDropdown: true = erscheint als Dropdown im OfferConfigurator
+// isDropdown: false = erscheint nur im Leistungskatalog (für manuelle Auswahl)
 export const SERVICE_CATEGORIES = [
-  { id: 'pv-montage', label: 'PV-Montage', icon: 'Sun' },
-  { id: 'elektroinstallation', label: 'Elektroinstallation', icon: 'Zap' },
-  { id: 'speicher', label: 'Speichersysteme', icon: 'Battery' },
-  { id: 'wallbox', label: 'Wallbox/E-Mobilität', icon: 'Car' },
-  { id: 'planung', label: 'Planung & Dokumentation', icon: 'FileText' },
-  { id: 'geruest', label: 'Gerüst & Logistik', icon: 'Truck' },
-  { id: 'sonstiges', label: 'Sonstiges', icon: 'MoreHorizontal' }
+  // Dropdown-Kategorien (Hauptkomponenten im OfferConfigurator)
+  { id: 'module', label: 'PV-Module', icon: 'Sun', isDropdown: true },
+  { id: 'wechselrichter', label: 'Wechselrichter', icon: 'Zap', isDropdown: true },
+  { id: 'speicher', label: 'Speicher', icon: 'Battery', isDropdown: true },
+  { id: 'wallbox', label: 'Wallbox', icon: 'Car', isDropdown: true },
+  { id: 'notstrom', label: 'Notstrom', icon: 'Power', isDropdown: true },
+  { id: 'optimierer', label: 'Optimierer', icon: 'Target', isDropdown: true },
+  { id: 'energiemanagement', label: 'Energiemanagement', icon: 'Cpu', isDropdown: true },
+  // Katalog-Kategorien (für Unterleistungen und manuelle Auswahl)
+  { id: 'pv-montage', label: 'PV-Montage', icon: 'Sun', isDropdown: false },
+  { id: 'elektroinstallation', label: 'Elektroinstallation', icon: 'Plug', isDropdown: false },
+  { id: 'planung', label: 'Planung & Dokumentation', icon: 'FileText', isDropdown: false },
+  { id: 'geruest', label: 'Gerüst & Logistik', icon: 'Truck', isDropdown: false },
+  { id: 'sonstiges', label: 'Sonstiges', icon: 'MoreHorizontal', isDropdown: false }
 ];
 
 // Einheiten für Leistungspositionen
@@ -85,6 +94,8 @@ export const ServiceCatalogProvider = ({ children }) => {
         ...serviceData,
         calculatedPrices,
         isActive: serviceData.isActive !== false,
+        isDefaultPosition: serviceData.isDefaultPosition || false,
+        defaultQuantity: serviceData.defaultQuantity || 1,
         sortOrder: serviceData.sortOrder || 999
       };
 
@@ -212,9 +223,13 @@ export const ServiceCatalogProvider = ({ children }) => {
   // Aktive Services
   const activeServices = services.filter(s => s.isActive !== false);
 
+  // Pflichtpositionen (werden automatisch zu neuen Angeboten hinzugefügt)
+  const defaultServices = services.filter(s => s.isActive !== false && s.isDefaultPosition === true);
+
   const value = {
     services,
     activeServices,
+    defaultServices,
     loading,
     error,
     addService,

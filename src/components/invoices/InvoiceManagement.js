@@ -3,40 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
-  Filter,
   FileText,
   Edit,
   Trash2,
-  Copy,
   Eye,
-  Download,
-  Send,
   CheckCircle,
-  XCircle,
   Clock,
   MoreVertical,
   ChevronDown,
-  TrendingUp,
   Users,
   Euro,
-  Settings,
-  Receipt
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
-import { useOffers, OFFER_STATUS, OFFER_STATUS_LABELS } from '../../context/OfferContext';
+import { useInvoices, INVOICE_STATUS, INVOICE_STATUS_LABELS } from '../../context/InvoiceContext';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
 import { useNotification } from '../../context/NotificationContext';
-import { useInvoices } from '../../context/InvoiceContext';
 import BaseModal from '../BaseModal';
-import OfferPDFPreview from './OfferPDFPreview';
+import InvoicePDFPreview from './InvoicePDFPreview';
 
-const OfferManagement = () => {
+const InvoiceManagement = () => {
   const navigate = useNavigate();
-  const { offers, loading, deleteOffer, duplicateOffer, updateOfferStatus, getStatistics } = useOffers();
+  const { invoices, loading, deleteInvoice, updateInvoiceStatus, getStatistics } = useInvoices();
   const { customers } = useCustomers();
   const { projects } = useProjects();
   const { showNotification } = useNotification();
-  const { createInvoiceFromOffer, hasDepositInvoice } = useInvoices();
 
   // Filter & Search State
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,26 +36,27 @@ const OfferManagement = () => {
   const [customerFilter, setCustomerFilter] = useState('all');
 
   // Modal State
-  const [selectedOffer, setSelectedOffer] = useState(null);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPDFPreview, setShowPDFPreview] = useState(false);
-  const [offerToDelete, setOfferToDelete] = useState(null);
+  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const [showActionsMenu, setShowActionsMenu] = useState(null);
 
   // Statistiken
-  const stats = useMemo(() => getStatistics(), [getStatistics, offers]);
+  const stats = useMemo(() => getStatistics(), [getStatistics, invoices]);
 
-  // Gefilterte Angebote
-  const filteredOffers = useMemo(() => {
-    return offers.filter(offer => {
+  // Gefilterte Rechnungen
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(invoice => {
       // Suche
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
-        const customer = customers.find(c => c.id === offer.customerID);
-        const project = projects.find(p => p.id === offer.projectID);
+        const customer = customers.find(c => c.id === invoice.customerID);
+        const project = projects.find(p => p.id === invoice.projectID);
 
         const matchesSearch =
-          offer.offerNumber?.toLowerCase().includes(term) ||
+          invoice.invoiceNumber?.toLowerCase().includes(term) ||
+          invoice.offerNumber?.toLowerCase().includes(term) ||
           customer?.firmennameKundenname?.toLowerCase().includes(term) ||
           customer?.name?.toLowerCase().includes(term) ||
           project?.projektname?.toLowerCase().includes(term);
@@ -72,14 +65,14 @@ const OfferManagement = () => {
       }
 
       // Status Filter
-      if (statusFilter !== 'all' && offer.status !== statusFilter) return false;
+      if (statusFilter !== 'all' && invoice.status !== statusFilter) return false;
 
       // Kunden Filter
-      if (customerFilter !== 'all' && offer.customerID !== customerFilter) return false;
+      if (customerFilter !== 'all' && invoice.customerID !== customerFilter) return false;
 
       return true;
     });
-  }, [offers, searchTerm, statusFilter, customerFilter, customers, projects]);
+  }, [invoices, searchTerm, statusFilter, customerFilter, customers, projects]);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('de-DE', {
@@ -90,7 +83,12 @@ const OfferManagement = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('de-DE');
+    try {
+      const date = typeof dateString === 'string' ? new Date(dateString) : dateString?.toDate?.() || new Date(dateString);
+      return date.toLocaleDateString('de-DE');
+    } catch {
+      return dateString;
+    }
   };
 
   const getCustomerName = (customerId) => {
@@ -105,7 +103,7 @@ const OfferManagement = () => {
   };
 
   const getStatusBadge = (status) => {
-    const statusInfo = OFFER_STATUS_LABELS[status] || { label: status, color: 'gray' };
+    const statusInfo = INVOICE_STATUS_LABELS[status] || { label: status, color: 'gray' };
     const colorClasses = {
       gray: 'bg-gray-100 text-gray-700',
       blue: 'bg-blue-100 text-blue-700',
@@ -121,52 +119,42 @@ const OfferManagement = () => {
     );
   };
 
-  const handleNewOffer = () => {
-    navigate('/offers/new');
+  const handleNewInvoice = () => {
+    navigate('/invoices/new');
   };
 
-  const handleEditOffer = (offer) => {
-    navigate(`/offers/${offer.id}`);
+  const handleEditInvoice = (invoice) => {
+    navigate(`/invoices/${invoice.id}`);
   };
 
-  const handleViewOffer = (offer) => {
-    setSelectedOffer(offer);
+  const handleViewInvoice = (invoice) => {
+    setSelectedInvoice(invoice);
     setShowPDFPreview(true);
   };
 
-  const handleDuplicateOffer = async (offer) => {
-    const result = await duplicateOffer(offer.id);
-    if (result.success) {
-      showNotification('Angebot dupliziert', 'success');
-    } else {
-      showNotification('Fehler beim Duplizieren', 'error');
-    }
-    setShowActionsMenu(null);
-  };
-
-  const handleDeleteClick = (offer) => {
-    setOfferToDelete(offer);
+  const handleDeleteClick = (invoice) => {
+    setInvoiceToDelete(invoice);
     setShowDeleteModal(true);
     setShowActionsMenu(null);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!offerToDelete) return;
+    if (!invoiceToDelete) return;
 
-    const result = await deleteOffer(offerToDelete.id);
+    const result = await deleteInvoice(invoiceToDelete.id);
     if (result.success) {
-      showNotification('Angebot gelöscht', 'success');
+      showNotification('Rechnung gelöscht', 'success');
     } else {
       showNotification('Fehler beim Löschen', 'error');
     }
     setShowDeleteModal(false);
-    setOfferToDelete(null);
+    setInvoiceToDelete(null);
   };
 
-  const handleStatusChange = async (offer, newStatus) => {
-    const result = await updateOfferStatus(offer.id, newStatus);
+  const handleStatusChange = async (invoice, newStatus) => {
+    const result = await updateInvoiceStatus(invoice.id, newStatus);
     if (result.success) {
-      showNotification(`Status geändert: ${OFFER_STATUS_LABELS[newStatus].label}`, 'success');
+      showNotification(`Status geändert: ${INVOICE_STATUS_LABELS[newStatus].label}`, 'success');
     } else {
       showNotification('Fehler beim Status-Update', 'error');
     }
@@ -174,27 +162,27 @@ const OfferManagement = () => {
   };
 
   // Unique customers for filter
-  const customersWithOffers = useMemo(() => {
-    const customerIds = [...new Set(offers.map(o => o.customerID))];
+  const customersWithInvoices = useMemo(() => {
+    const customerIds = [...new Set(invoices.map(i => i.customerID))];
     return customers.filter(c => customerIds.includes(c.id));
-  }, [offers, customers]);
+  }, [invoices, customers]);
 
   return (
     <div className="h-full flex flex-col space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Angebote</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Rechnungen</h1>
           <p className="text-sm text-gray-500">
-            {filteredOffers.length} von {offers.length} Angeboten
+            {filteredInvoices.length} von {invoices.length} Rechnungen
           </p>
         </div>
         <button
-          onClick={handleNewOffer}
+          onClick={handleNewInvoice}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm font-medium"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Neues Angebot
+          Neue Rechnung
         </button>
       </div>
 
@@ -217,7 +205,7 @@ const OfferManagement = () => {
             <div>
               <p className="text-sm text-gray-500">Offen</p>
               <p className="text-2xl font-bold text-blue-600">
-                {(stats.byStatus?.draft || 0) + (stats.byStatus?.sent || 0)}
+                {(stats.byStatus?.sent || 0) + (stats.byStatus?.overdue || 0)}
               </p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
@@ -229,8 +217,8 @@ const OfferManagement = () => {
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Angenommen</p>
-              <p className="text-2xl font-bold text-green-600">{stats.byStatus?.accepted || 0}</p>
+              <p className="text-sm text-gray-500">Bezahlt</p>
+              <p className="text-2xl font-bold text-green-600">{stats.byStatus?.paid || 0}</p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
               <CheckCircle className="h-6 w-6 text-green-600" />
@@ -241,11 +229,11 @@ const OfferManagement = () => {
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Angenommener Wert</p>
-              <p className="text-xl font-bold text-green-600">{formatPrice(stats.acceptedValue)}</p>
+              <p className="text-sm text-gray-500">Offener Betrag</p>
+              <p className="text-xl font-bold text-orange-600">{formatPrice(stats.openValue)}</p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Euro className="h-6 w-6 text-green-600" />
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <Euro className="h-6 w-6 text-orange-600" />
             </div>
           </div>
         </div>
@@ -261,7 +249,7 @@ const OfferManagement = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Angebotsnummer, Kunde oder Projekt suchen..."
+              placeholder="Rechnungsnummer, Kunde oder Angebot suchen..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -274,7 +262,7 @@ const OfferManagement = () => {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Status</option>
-              {Object.entries(OFFER_STATUS_LABELS).map(([key, value]) => (
+              {Object.entries(INVOICE_STATUS_LABELS).map(([key, value]) => (
                 <option key={key} value={key}>{value.label}</option>
               ))}
             </select>
@@ -288,7 +276,7 @@ const OfferManagement = () => {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Alle Kunden</option>
-              {customersWithOffers.map(customer => (
+              {customersWithInvoices.map(customer => (
                 <option key={customer.id} value={customer.id}>
                   {customer.firmennameKundenname || customer.name}
                 </option>
@@ -298,34 +286,30 @@ const OfferManagement = () => {
         </div>
       </div>
 
-      {/* Angebotsliste */}
+      {/* Rechnungsliste */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
-        {/* Titel-Zeile mit Settings-Button */}
         <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">Angebotsliste</h2>
-          <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-            <Settings className="h-5 w-5" />
-          </button>
+          <h2 className="text-lg font-semibold text-gray-900">Rechnungsliste</h2>
         </div>
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
-        ) : filteredOffers.length === 0 ? (
+        ) : filteredInvoices.length === 0 ? (
           <div className="text-center py-12">
             <FileText className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Keine Angebote gefunden</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Keine Rechnungen gefunden</h3>
             <p className="text-gray-500 mb-4">
-              {offers.length === 0
-                ? 'Erstellen Sie Ihr erstes Angebot'
+              {invoices.length === 0
+                ? 'Erstellen Sie Ihre erste Rechnung'
                 : 'Passen Sie Ihre Filterkriterien an'}
             </p>
-            {offers.length === 0 && (
+            {invoices.length === 0 && (
               <button
-                onClick={handleNewOffer}
+                onClick={handleNewInvoice}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                Erstes Angebot erstellen
+                Erste Rechnung erstellen
               </button>
             )}
           </div>
@@ -337,130 +321,121 @@ const OfferManagement = () => {
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       <div className="flex items-center gap-1">
-                        Angebot
+                        Rechnung
                         <ChevronDown className="h-3 w-3 text-gray-400" />
                       </div>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <div className="flex items-center gap-1">
-                        Kunde
-                        <ChevronDown className="h-3 w-3 text-gray-400" />
-                      </div>
+                      Kunde
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Projekt
+                      Angebot
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Betrag
                     </th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                      <div className="flex items-center justify-center gap-1">
-                        Status
-                        <ChevronDown className="h-3 w-3 text-gray-400" />
-                      </div>
+                      Status
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Datum
+                      Fällig am
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Aktionen
                     </th>
                   </tr>
                 </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredOffers.map((offer) => (
-                  <tr
-                    key={offer.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => handleViewOffer(offer)}
-                  >
-                    <td className="px-4 py-3">
-                      <span className="font-medium text-gray-900">{offer.offerNumber}</span>
-                      <span className="text-xs text-gray-500 block">v{offer.version || 1}</span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-2 text-gray-400" />
-                        {getCustomerName(offer.customerID)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {getProjectName(offer.projectID)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {formatPrice(offer.totals?.grossTotal)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {getStatusBadge(offer.status)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-sm">
-                      {formatDate(offer.createdAt?.toDate?.() || offer.createdAt)}
-                    </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="relative inline-block">
-                        <button
-                          onClick={() => setShowActionsMenu(showActionsMenu === offer.id ? null : offer.id)}
-                          className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                        >
-                          <MoreVertical className="h-5 w-5" />
-                        </button>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredInvoices.map((invoice) => (
+                    <tr
+                      key={invoice.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => handleViewInvoice(invoice)}
+                    >
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-900">{invoice.invoiceNumber}</span>
+                        <span className="text-xs text-gray-500 block">{formatDate(invoice.invoiceDate)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2 text-gray-400" />
+                          {getCustomerName(invoice.customerID)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-sm">
+                        {invoice.offerNumber || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {formatPrice(invoice.totals?.grossTotal)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {getStatusBadge(invoice.status)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-sm">
+                        {formatDate(invoice.dueDate)}
+                      </td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative inline-block">
+                          <button
+                            onClick={() => setShowActionsMenu(showActionsMenu === invoice.id ? null : invoice.id)}
+                            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                          >
+                            <MoreVertical className="h-5 w-5" />
+                          </button>
 
-                        {/* Actions Dropdown - nur Bearbeiten und Löschen */}
-                        {showActionsMenu === offer.id && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-10"
-                              onClick={() => setShowActionsMenu(null)}
-                            />
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-                              <div className="py-1">
-                                <button
-                                  onClick={() => {
-                                    handleEditOffer(offer);
-                                    setShowActionsMenu(null);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                                >
-                                  <Edit className="h-4 w-4 mr-3" />
-                                  Bearbeiten
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    setShowActionsMenu(null);
-                                    try {
-                                      const result = await createInvoiceFromOffer(offer);
-                                      if (result.success) {
-                                        showNotification(`${hasDepositInvoice(offer.id) ? 'Schlussrechnung' : 'Anzahlungsrechnung'} wurde erstellt`, 'success');
-                                        navigate('/invoices');
-                                      } else {
-                                        showNotification('Fehler beim Erstellen der Rechnung', 'error');
-                                      }
-                                    } catch (err) {
-                                      showNotification('Fehler beim Erstellen der Rechnung', 'error');
-                                    }
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-gray-100 flex items-center"
-                                >
-                                  <Receipt className="h-4 w-4 mr-3" />
-                                  {hasDepositInvoice(offer.id) ? 'Schlussrechnung erstellen' : 'Anzahlungsrechnung erstellen'}
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteClick(offer)}
-                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 flex items-center"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-3" />
-                                  Löschen
-                                </button>
+                          {showActionsMenu === invoice.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setShowActionsMenu(null)}
+                              />
+                              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                                <div className="py-1">
+                                  <button
+                                    onClick={() => {
+                                      handleEditInvoice(invoice);
+                                      setShowActionsMenu(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                  >
+                                    <Edit className="h-4 w-4 mr-3" />
+                                    Bearbeiten
+                                  </button>
+                                  {invoice.status === INVOICE_STATUS.SENT && (
+                                    <button
+                                      onClick={() => handleStatusChange(invoice, INVOICE_STATUS.PAID)}
+                                      className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-gray-100 flex items-center"
+                                    >
+                                      <CheckCircle className="h-4 w-4 mr-3" />
+                                      Als bezahlt markieren
+                                    </button>
+                                  )}
+                                  {invoice.status === INVOICE_STATUS.DRAFT && (
+                                    <button
+                                      onClick={() => handleStatusChange(invoice, INVOICE_STATUS.SENT)}
+                                      className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-gray-100 flex items-center"
+                                    >
+                                      <FileText className="h-4 w-4 mr-3" />
+                                      Als gesendet markieren
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteClick(invoice)}
+                                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-3" />
+                                    Löschen
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -471,21 +446,21 @@ const OfferManagement = () => {
         isOpen={showDeleteModal}
         onClose={() => {
           setShowDeleteModal(false);
-          setOfferToDelete(null);
+          setInvoiceToDelete(null);
         }}
-        title="Angebot löschen"
+        title="Rechnung löschen"
         size="sm"
       >
         <div className="p-6">
           <p className="text-gray-600 mb-4">
-            Möchten Sie das Angebot <strong>{offerToDelete?.offerNumber}</strong> wirklich löschen?
+            Möchten Sie die Rechnung <strong>{invoiceToDelete?.invoiceNumber}</strong> wirklich löschen?
             Diese Aktion kann nicht rückgängig gemacht werden.
           </p>
           <div className="flex justify-end space-x-3">
             <button
               onClick={() => {
                 setShowDeleteModal(false);
-                setOfferToDelete(null);
+                setInvoiceToDelete(null);
               }}
               className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
             >
@@ -502,18 +477,18 @@ const OfferManagement = () => {
       </BaseModal>
 
       {/* PDF Preview Modal */}
-      {showPDFPreview && selectedOffer && (
-        <OfferPDFPreview
-          offer={selectedOffer}
+      {showPDFPreview && selectedInvoice && (
+        <InvoicePDFPreview
+          invoice={selectedInvoice}
           isOpen={showPDFPreview}
           onClose={() => {
             setShowPDFPreview(false);
-            setSelectedOffer(null);
+            setSelectedInvoice(null);
           }}
-          onEdit={(offer) => {
+          onEdit={(invoice) => {
             setShowPDFPreview(false);
-            setSelectedOffer(null);
-            handleEditOffer(offer);
+            setSelectedInvoice(null);
+            handleEditInvoice(invoice);
           }}
         />
       )}
@@ -521,4 +496,4 @@ const OfferManagement = () => {
   );
 };
 
-export default OfferManagement;
+export default InvoiceManagement;

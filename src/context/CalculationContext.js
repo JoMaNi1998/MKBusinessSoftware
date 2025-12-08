@@ -34,27 +34,39 @@ const DEFAULT_SETTINGS = {
     reducedRate: 7             // Ermäßigt
   },
 
-  // Arbeitszeitfaktoren für erschwerte Bedingungen
+  // Arbeitszeitfaktoren pro Gewerk
   laborFactors: {
-    roofPitchCategories: [
-      { id: 'standard', label: 'Standard (0-25°)', laborFactor: 1.0 },
-      { id: 'medium', label: 'Mittel (25-35°)', laborFactor: 1.15 },
-      { id: 'steep', label: 'Steil (>35°)', laborFactor: 1.30 }
+    dach: [
+      { id: 'normal', label: 'Normal', laborFactor: 1.0 },
+      { id: 'aufwendig', label: 'Aufwendig', laborFactor: 1.15 },
+      { id: 'komplex', label: 'Komplex', laborFactor: 1.30 }
     ],
-    cableLengthCategories: [
-      { id: 'standard', label: 'Standard (<15m)', laborFactor: 1.0 },
-      { id: 'medium', label: 'Mittel (15-30m)', laborFactor: 1.20 },
-      { id: 'long', label: 'Lang (>30m)', laborFactor: 1.40 }
+    elektro: [
+      { id: 'normal', label: 'Normal', laborFactor: 1.0 },
+      { id: 'aufwendig', label: 'Aufwendig', laborFactor: 1.20 },
+      { id: 'komplex', label: 'Komplex', laborFactor: 1.40 }
     ],
-    pvLayoutCategories: [
-      { id: 'standard', label: 'Standard (einfach)', laborFactor: 1.0 },
-      { id: 'medium', label: 'Mittel (mehrere Flächen)', laborFactor: 1.15 },
-      { id: 'complex', label: 'Komplex (Gauben/Verschattung)', laborFactor: 1.30 }
+    geruest: [
+      { id: 'normal', label: 'Normal', laborFactor: 1.0 },
+      { id: 'aufwendig', label: 'Aufwendig', laborFactor: 1.15 },
+      { id: 'komplex', label: 'Komplex', laborFactor: 1.30 }
     ],
-    travelCategories: [
-      { id: 'standard', label: 'Standard (<30km)', laborFactor: 1.0 },
-      { id: 'medium', label: 'Mittel (30-60km)', laborFactor: 1.15 },
-      { id: 'far', label: 'Weit (>60km)', laborFactor: 1.30 }
+    fahrt: [
+      { id: 'normal', label: 'Normal', laborFactor: 1.0 },
+      { id: 'aufwendig', label: 'Aufwendig', laborFactor: 1.15 },
+      { id: 'komplex', label: 'Komplex', laborFactor: 1.30 }
+    ]
+  },
+
+  // Mengenstaffel für Arbeitszeit (PV-Montage)
+  quantityScales: {
+    enabled: true,
+    tiers: [
+      { minQuantity: 1, maxQuantity: 10, laborDiscount: 0, label: '1-10 Module' },
+      { minQuantity: 11, maxQuantity: 20, laborDiscount: 5, label: '11-20 Module' },
+      { minQuantity: 21, maxQuantity: 30, laborDiscount: 10, label: '21-30 Module' },
+      { minQuantity: 31, maxQuantity: 50, laborDiscount: 15, label: '31-50 Module' },
+      { minQuantity: 51, maxQuantity: null, laborDiscount: 20, label: '>50 Module' }
     ]
   },
 
@@ -91,6 +103,7 @@ export const CalculationProvider = ({ children }) => {
               margins: { ...DEFAULT_SETTINGS.margins, ...settingsData.margins },
               tax: { ...DEFAULT_SETTINGS.tax, ...settingsData.tax },
               laborFactors: { ...DEFAULT_SETTINGS.laborFactors, ...settingsData.laborFactors },
+              quantityScales: { ...DEFAULT_SETTINGS.quantityScales, ...settingsData.quantityScales },
               offerDefaults: { ...DEFAULT_SETTINGS.offerDefaults, ...settingsData.offerDefaults }
             }));
           } else {
@@ -220,24 +233,74 @@ export const CalculationProvider = ({ children }) => {
     return netAmount + tax;
   }, [calculateTax]);
 
-  // Angebotssummen berechnen
-  const calculateOfferTotals = useCallback((items, globalDiscount = 0) => {
+  // Modulanzahl aus Angebotspositionen ermitteln (für Mengenstaffel)
+  const getModuleCount = useCallback((items) => {
+    return items
+      .filter(item => item.category === 'pv-montage' && item.unit === 'Stk')
+      .reduce((sum, item) => sum + (item.quantity || 0), 0);
+  }, []);
+
+  // Passende Staffel für Modulanzahl finden
+  const getQuantityScaleTier = useCallback((moduleCount) => {
+    if (!settings.quantityScales?.enabled || !settings.quantityScales?.tiers) {
+      return null;
+    }
+    return settings.quantityScales.tiers.find(t =>
+      moduleCount >= t.minQuantity &&
+      (t.maxQuantity === null || moduleCount <= t.maxQuantity)
+    ) || null;
+  }, [settings.quantityScales]);
+
+  // Staffelrabatt in Prozent ermitteln
+  const getQuantityScaleDiscount = useCallback((moduleCount) => {
+    const tier = getQuantityScaleTier(moduleCount);
+    return tier?.laborDiscount || 0;
+  }, [getQuantityScaleTier]);
+
+  // Angebotssummen berechnen (mit Mengenstaffel)
+  const calculateOfferTotals = useCallback((items, globalDiscount = 0, customTaxRate = null) => {
+    // Modulanzahl und Staffelrabatt ermitteln
+    const moduleCount = getModuleCount(items);
+    const quantityScaleDiscount = getQuantityScaleDiscount(moduleCount);
+    const quantityScaleTier = getQuantityScaleTier(moduleCount);
+
+    // Staffelrabatt auf Arbeitszeit der PV-Montage-Positionen anwenden
+    let laborReductionTotal = 0;
+    if (quantityScaleDiscount > 0) {
+      items.forEach(item => {
+        if (item.category === 'pv-montage' && item.breakdown?.laborCost) {
+          const laborReduction = item.breakdown.laborCost * (item.quantity || 1) * (quantityScaleDiscount / 100);
+          laborReductionTotal += laborReduction;
+        }
+      });
+    }
+
     const subtotalNet = items.reduce((sum, item) => sum + (item.totalNet || 0), 0);
-    const discountAmount = subtotalNet * (globalDiscount / 100);
-    const netTotal = subtotalNet - discountAmount;
-    const taxAmount = calculateTax(netTotal);
+    const subtotalAfterScale = subtotalNet - laborReductionTotal;
+    const discountAmount = subtotalAfterScale * (globalDiscount / 100);
+    const netTotal = subtotalAfterScale - discountAmount;
+
+    // Verwende custom taxRate falls angegeben, sonst default
+    const taxRate = customTaxRate !== null ? customTaxRate : settings.tax.defaultRate;
+    const taxAmount = netTotal * (taxRate / 100);
     const grossTotal = netTotal + taxAmount;
 
     return {
       subtotalNet,
+      laborReductionTotal,
+      subtotalAfterScale,
       discountPercent: globalDiscount,
       discountAmount,
       netTotal,
-      taxRate: settings.tax.defaultRate,
+      taxRate,
       taxAmount,
-      grossTotal
+      grossTotal,
+      // Staffel-Infos
+      moduleCount,
+      quantityScaleDiscount,
+      quantityScaleTier
     };
-  }, [calculateTax, settings.tax.defaultRate]);
+  }, [settings.tax.defaultRate, getModuleCount, getQuantityScaleDiscount, getQuantityScaleTier]);
 
   // Gültigkeitsdatum berechnen
   const calculateValidUntil = useCallback((fromDate = new Date()) => {
@@ -263,6 +326,10 @@ export const CalculationProvider = ({ children }) => {
     calculateGross,
     calculateOfferTotals,
     calculateValidUntil,
+    // Mengenstaffel-Funktionen
+    getModuleCount,
+    getQuantityScaleTier,
+    getQuantityScaleDiscount,
     DEFAULT_SETTINGS
   };
 

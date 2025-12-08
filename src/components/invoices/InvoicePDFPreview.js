@@ -1,36 +1,26 @@
 import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   X,
   Download,
   Printer,
   FileText,
-  Edit,
-  Receipt
+  Edit
 } from 'lucide-react';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
-import { OFFER_STATUS_LABELS, OFFER_STATUS } from '../../context/OfferContext';
-import { useInvoices } from '../../context/InvoiceContext';
+import { INVOICE_STATUS_LABELS, INVOICE_TYPE, INVOICE_TYPE_LABELS } from '../../context/InvoiceContext';
 
-const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
-  const navigate = useNavigate();
+const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
   const { customers } = useCustomers();
   const { projects } = useProjects();
-  const { hasDepositInvoice, getInvoicesByOffer, createInvoiceFromOffer } = useInvoices();
-  const [isCreatingInvoice, setIsCreatingInvoice] = React.useState(false);
-
-  // Prüfen welcher Rechnungstyp als nächstes erstellt werden soll
-  const depositExists = offer ? hasDepositInvoice(offer.id) : false;
-  const existingInvoices = offer ? getInvoicesByOffer(offer.id) : [];
 
   const customer = useMemo(() => {
-    return customers.find(c => c.id === offer?.customerID);
-  }, [customers, offer?.customerID]);
+    return customers.find(c => c.id === invoice?.customerID);
+  }, [customers, invoice?.customerID]);
 
   const project = useMemo(() => {
-    return projects.find(p => p.id === offer?.projectID);
-  }, [projects, offer?.projectID]);
+    return projects.find(p => p.id === invoice?.projectID);
+  }, [projects, invoice?.projectID]);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('de-DE', {
@@ -57,30 +47,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
     window.print();
   };
 
-  const handleCreateInvoice = async () => {
-    if (isCreatingInvoice) return;
-
-    setIsCreatingInvoice(true);
-    try {
-      // Rechnung direkt erstellen (Anzahlung oder Schlussrechnung wird automatisch erkannt)
-      const result = await createInvoiceFromOffer(offer);
-
-      if (result.success) {
-        onClose();
-        // Zur Rechnungsliste navigieren
-        navigate('/invoices');
-      } else {
-        alert('Fehler beim Erstellen der Rechnung: ' + (result.error || 'Unbekannter Fehler'));
-      }
-    } catch (err) {
-      console.error('Error creating invoice:', err);
-      alert('Fehler beim Erstellen der Rechnung');
-    } finally {
-      setIsCreatingInvoice(false);
-    }
-  };
-
-  if (!isOpen || !offer) return null;
+  if (!isOpen || !invoice) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 !m-0 !top-0">
@@ -89,31 +56,28 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <FileText className="h-5 w-5 text-gray-600" />
-            <span className="text-lg font-semibold text-gray-900">Angebotsvorschau</span>
-            <span className="font-medium text-gray-600">{offer.offerNumber}</span>
+            <span className="text-lg font-semibold text-gray-900">Rechnungsvorschau</span>
+            <span className="font-medium text-gray-600">{invoice.invoiceNumber}</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs ${
+              INVOICE_STATUS_LABELS[invoice.status]?.color === 'green' ? 'bg-green-100 text-green-700' :
+              INVOICE_STATUS_LABELS[invoice.status]?.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+              INVOICE_STATUS_LABELS[invoice.status]?.color === 'red' ? 'bg-red-100 text-red-700' :
+              INVOICE_STATUS_LABELS[invoice.status]?.color === 'orange' ? 'bg-orange-100 text-orange-700' :
+              'bg-gray-100 text-gray-700'
+            }`}>
+              {INVOICE_STATUS_LABELS[invoice.status]?.label}
+            </span>
           </div>
           <div className="flex items-center space-x-2">
             {onEdit && (
               <button
-                onClick={() => onEdit(offer)}
+                onClick={() => onEdit(invoice)}
                 className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
               >
                 <Edit className="h-4 w-4 mr-1" />
                 Bearbeiten
               </button>
             )}
-            <button
-                onClick={handleCreateInvoice}
-                disabled={isCreatingInvoice}
-                className={`px-3 py-1.5 text-sm text-green-600 hover:bg-green-50 rounded-lg flex items-center font-medium ${isCreatingInvoice ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isCreatingInvoice ? (
-                  <div className="h-4 w-4 mr-1 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Receipt className="h-4 w-4 mr-1" />
-                )}
-                {depositExists ? 'Schlussrechnung' : 'Anzahlungsrechnung'}
-              </button>
             <button
               onClick={handlePrint}
               className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
@@ -137,16 +101,26 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
           </div>
         </div>
 
-        {/* Scrollbarer Inhalt - nur eine Scrollbar */}
+        {/* Scrollbarer Inhalt */}
         <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
           <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none">
             {/* PDF Content - A4 Layout */}
-            <div className="p-8 print:p-0" id="offer-pdf-content">
+            <div className="p-8 print:p-0" id="invoice-pdf-content">
               {/* Header */}
               <div className="flex justify-between items-start mb-8 pb-6 border-b">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
-                  <p className="text-gray-600 mt-1">{offer.offerNumber}</p>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    {invoice.invoiceType === INVOICE_TYPE.DEPOSIT ? 'ANZAHLUNGSRECHNUNG' :
+                     invoice.invoiceType === INVOICE_TYPE.FINAL ? 'SCHLUSSRECHNUNG' :
+                     'RECHNUNG'}
+                  </h1>
+                  <p className="text-gray-600 mt-1">{invoice.invoiceNumber}</p>
+                  {invoice.offerNumber && (
+                    <p className="text-sm text-gray-500 mt-1">Angebot: {invoice.offerNumber}</p>
+                  )}
+                  {invoice.invoiceType === INVOICE_TYPE.FINAL && invoice.depositInvoiceNumber && (
+                    <p className="text-sm text-gray-500">Anzahlung: {invoice.depositInvoiceNumber}</p>
+                  )}
                 </div>
                 <div className="text-right text-sm text-gray-600">
                   <p className="font-medium text-gray-900">Ihr Unternehmen</p>
@@ -160,7 +134,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
               {/* Kunde & Datum */}
               <div className="grid grid-cols-2 gap-8 mb-8">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Empfänger</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Rechnungsempfänger</p>
                   <div className="text-sm">
                     <p className="font-medium text-gray-900">
                       {customer?.firmennameKundenname || customer?.name || '-'}
@@ -174,12 +148,12 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                 <div className="text-right">
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Datum:</span>
-                      <span>{formatDate(offer.createdAt)}</span>
+                      <span className="text-gray-500">Rechnungsdatum:</span>
+                      <span>{formatDate(invoice.invoiceDate)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Gültig bis:</span>
-                      <span>{formatDate(offer.conditions?.validUntil)}</span>
+                      <span className="text-gray-500">Fällig am:</span>
+                      <span className="font-medium">{formatDate(invoice.dueDate)}</span>
                     </div>
                     {project && (
                       <div className="flex justify-between">
@@ -194,14 +168,14 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
               {/* Betreff */}
               <div className="mb-6">
                 <p className="font-medium text-gray-900">
-                  Betreff: Angebot {project ? `- ${project.projektname || project.name}` : ''}
+                  Betreff: Rechnung {project ? `- ${project.projektname || project.name}` : ''}
                 </p>
               </div>
 
               {/* Einleitung */}
               <div className="mb-6 text-sm text-gray-600">
                 <p>
-                  Vielen Dank für Ihre Anfrage. Wir freuen uns, Ihnen folgendes Angebot unterbreiten zu dürfen:
+                  Für die erbrachten Leistungen erlauben wir uns, Ihnen folgende Positionen in Rechnung zu stellen:
                 </p>
               </div>
 
@@ -219,7 +193,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {(offer.items || []).map((item, index) => (
+                    {(invoice.items || []).map((item, index) => (
                       <tr key={item.id || index} className="border-b border-gray-100">
                         <td className="py-3 text-gray-600">{item.position || index + 1}</td>
                         <td className="py-3">
@@ -240,67 +214,82 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
 
               {/* Summen */}
               <div className="flex justify-end mb-8">
-                <div className="w-64">
+                <div className="w-72">
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Zwischensumme (netto):</span>
-                      <span>{formatPrice(offer.totals?.subtotalNet)}</span>
-                    </div>
-                    {offer.totals?.discountPercent > 0 && (
-                      <div className="flex justify-between text-red-600">
-                        <span>Rabatt ({offer.totals?.discountPercent}%):</span>
-                        <span>- {formatPrice(offer.totals?.discountAmount)}</span>
-                      </div>
+                    {/* Bei Schlussrechnung: Gesamtübersicht zeigen */}
+                    {invoice.invoiceType === INVOICE_TYPE.FINAL && invoice.offerTotals && (
+                      <>
+                        <div className="flex justify-between text-gray-500">
+                          <span>Auftragssumme (brutto):</span>
+                          <span>{formatPrice(invoice.offerTotals?.grossTotal)}</span>
+                        </div>
+                        <div className="flex justify-between text-green-600">
+                          <span>./. Anzahlung ({invoice.offerDepositPercent || 50}%):</span>
+                          <span>- {formatPrice(invoice.depositAmount || (invoice.offerTotals?.grossTotal * (invoice.offerDepositPercent || 50) / 100))}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2 font-medium">
+                          <span>Restbetrag:</span>
+                          <span>{formatPrice(invoice.totals?.grossTotal)}</span>
+                        </div>
+                        <div className="border-t my-2"></div>
+                      </>
                     )}
-                    <div className="flex justify-between border-t pt-2">
+
+                    <div className="flex justify-between">
                       <span className="text-gray-600">Netto:</span>
-                      <span>{formatPrice(offer.totals?.netTotal)}</span>
+                      <span>{formatPrice(invoice.totals?.netTotal)}</span>
                     </div>
-                    {(offer.totals?.taxRate > 0) && (
+                    {(invoice.totals?.taxRate > 0) && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">MwSt ({offer.totals?.taxRate}%):</span>
-                        <span>{formatPrice(offer.totals?.taxAmount)}</span>
+                        <span className="text-gray-600">MwSt ({invoice.totals?.taxRate}%):</span>
+                        <span>{formatPrice(invoice.totals?.taxAmount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between border-t-2 border-gray-900 pt-2 text-lg font-bold">
-                      <span>Gesamtbetrag:</span>
-                      <span>{formatPrice(offer.totals?.grossTotal)}</span>
+                      <span>Rechnungsbetrag:</span>
+                      <span>{formatPrice(invoice.totals?.grossTotal)}</span>
                     </div>
-                    {/* Anzahlung */}
-                    {(offer.depositPercent > 0) && (
-                      <>
-                        <div className="flex justify-between mt-3 pt-3 border-t border-dashed text-sm">
-                          <span className="text-gray-600">Anzahlung ({offer.depositPercent}%):</span>
-                          <span className="font-medium">{formatPrice((offer.totals?.grossTotal || 0) * (offer.depositPercent / 100))}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Schlussrechnung ({100 - offer.depositPercent}%):</span>
-                          <span className="font-medium">{formatPrice((offer.totals?.grossTotal || 0) * ((100 - offer.depositPercent) / 100))}</span>
-                        </div>
-                      </>
-                    )}
                   </div>
                 </div>
               </div>
 
+              {/* Zahlungsinformationen */}
+              <div className="border-t pt-6 mb-6 text-sm">
+                <h3 className="font-medium text-gray-900 mb-3">Zahlungsinformationen</h3>
+                <div className="grid grid-cols-2 gap-4 text-gray-600">
+                  <div>
+                    <span className="text-gray-500">Zahlungsbedingungen:</span>
+                    <p>{invoice.paymentTerms || '14 Tage netto'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Fällig am:</span>
+                    <p className="font-medium">{formatDate(invoice.dueDate)}</p>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500 mb-1">Bankverbindung:</p>
+                  <p>IBAN: DE89 3704 0044 0532 0130 00</p>
+                  <p>BIC: COBADEFFXXX</p>
+                  <p className="mt-1">Verwendungszweck: {invoice.invoiceNumber}</p>
+                </div>
+              </div>
+
+              {/* Notizen */}
+              {invoice.notes && (
+                <div className="border-t pt-6 mb-6 text-sm">
+                  <h3 className="font-medium text-gray-900 mb-2">Anmerkungen</h3>
+                  <p className="text-gray-600 whitespace-pre-line">{invoice.notes}</p>
+                </div>
+              )}
+
               {/* Footer */}
-              <div className="border-t pt-6 text-sm text-gray-600 space-y-3">
-                {(offer.depositPercent > 0) && (
-                  <>
-                    <p>
-                      Die Endzahlung erfolgt mit einer Frist von sieben Tagen nach Abschluss aller Montagearbeiten.
-                    </p>
-                    <p>
-                      Wir würden uns sehr freuen, wenn unser Angebot Ihre Zustimmung findet. Sie haben Fragen oder wünschen
-                      weitere Informationen? Rufen Sie uns an – wir sind für Sie da.
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Durch Anzahlung stimmen Sie den Widerrufsbedingungen zu.
-                    </p>
-                  </>
-                )}
-                <p className="mt-4">Mit freundlichen Grüßen</p>
-                <p className="mt-2 font-medium text-gray-700">Ihr Unternehmen</p>
+              <div className="border-t pt-6 text-sm text-gray-500">
+                <p>
+                  Bitte überweisen Sie den Betrag von <strong>{formatPrice(invoice.totals?.grossTotal)}</strong> bis
+                  zum <strong>{formatDate(invoice.dueDate)}</strong> auf das oben genannte Konto.
+                </p>
+                <p className="mt-4">Vielen Dank für Ihr Vertrauen!</p>
+                <p className="mt-4 font-medium text-gray-700">Ihr Unternehmen</p>
               </div>
             </div>
           </div>
@@ -313,10 +302,10 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
           body * {
             visibility: hidden;
           }
-          #offer-pdf-content, #offer-pdf-content * {
+          #invoice-pdf-content, #invoice-pdf-content * {
             visibility: visible;
           }
-          #offer-pdf-content {
+          #invoice-pdf-content {
             position: absolute;
             left: 0;
             top: 0;
@@ -329,4 +318,4 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
   );
 };
 
-export default OfferPDFPreview;
+export default InvoicePDFPreview;

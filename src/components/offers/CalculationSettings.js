@@ -7,40 +7,41 @@ import {
   Save,
   RefreshCw,
   AlertCircle,
-  CheckCircle,
   Info,
-  Mountain,
-  Cable,
-  LayoutGrid,
+  TrendingDown,
+  Plus,
+  Trash2,
+  Home,
+  Zap,
+  Layers,
   Car
 } from 'lucide-react';
 import { useCalculation } from '../../context/CalculationContext';
 import { useNotification } from '../../context/NotificationContext';
 
-// Default-Kategorien für Arbeitszeitfaktoren
-const DEFAULT_ROOF_PITCH_CATEGORIES = [
-  { id: 'standard', label: 'Standard (0-25°)', laborFactor: 1.0 },
-  { id: 'medium', label: 'Mittel (25-35°)', laborFactor: 1.15 },
-  { id: 'steep', label: 'Steil (>35°)', laborFactor: 1.30 }
-];
-
-const DEFAULT_CABLE_LENGTH_CATEGORIES = [
-  { id: 'standard', label: 'Standard (<15m)', laborFactor: 1.0 },
-  { id: 'medium', label: 'Mittel (15-30m)', laborFactor: 1.20 },
-  { id: 'long', label: 'Lang (>30m)', laborFactor: 1.40 }
-];
-
-const DEFAULT_PV_LAYOUT_CATEGORIES = [
-  { id: 'standard', label: 'Standard (einfach)', laborFactor: 1.0 },
-  { id: 'medium', label: 'Mittel (mehrere Flächen)', laborFactor: 1.15 },
-  { id: 'complex', label: 'Komplex (Gauben/Verschattung)', laborFactor: 1.30 }
-];
-
-const DEFAULT_TRAVEL_CATEGORIES = [
-  { id: 'standard', label: 'Standard (<30km)', laborFactor: 1.0 },
-  { id: 'medium', label: 'Mittel (30-60km)', laborFactor: 1.15 },
-  { id: 'far', label: 'Weit (>60km)', laborFactor: 1.30 }
-];
+// Labels und Icons für Arbeitszeitfaktoren
+const LABOR_FACTOR_CONFIG = {
+  dach: {
+    label: 'Dach',
+    description: 'Aufschlag für PV-Montage-Arbeiten',
+    icon: Home
+  },
+  elektro: {
+    label: 'Elektro',
+    description: 'Aufschlag für Elektroinstallationsarbeiten',
+    icon: Zap
+  },
+  geruest: {
+    label: 'Gerüst',
+    description: 'Aufschlag für Gerüstarbeiten',
+    icon: Layers
+  },
+  fahrt: {
+    label: 'Fahrt',
+    description: 'Aufschlag für alle Leistungen basierend auf Anfahrt',
+    icon: Car
+  }
+};
 
 const CalculationSettings = () => {
   const { settings, loading, saving, saveSettings, DEFAULT_SETTINGS } = useCalculation();
@@ -309,188 +310,243 @@ const CalculationSettings = () => {
           <h3 className="text-base font-medium text-gray-900">Arbeitszeitfaktoren</h3>
         </div>
         <p className="text-sm text-gray-500 mb-6">
-          Faktoren für erschwerte Arbeitsbedingungen bei PV-Montage und Elektroinstallation.
+          Faktoren pro Gewerk für erschwerte Arbeitsbedingungen. Stufen: Normal / Aufwendig / Komplex.
         </p>
 
-        {/* Dachneigung */}
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <Mountain className="h-4 w-4 text-gray-500" />
-            <h4 className="text-sm font-medium text-gray-700">Dachneigung (PV-Montage)</h4>
-          </div>
-          <p className="text-xs text-gray-500 mb-3">
-            Je steiler das Dach, desto mehr Arbeitszeit für die PV-Montage
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(localSettings.laborFactors?.roofPitchCategories || DEFAULT_ROOF_PITCH_CATEGORIES).map((cat, index) => (
-              <div key={cat.id} className="bg-gray-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {cat.label}
-                </label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    min="1"
-                    max="3"
-                    step="0.05"
-                    value={cat.laborFactor}
-                    onChange={(e) => {
-                      const currentCategories = localSettings.laborFactors?.roofPitchCategories || DEFAULT_ROOF_PITCH_CATEGORIES;
-                      const newCategories = [...currentCategories];
-                      newCategories[index] = { ...cat, laborFactor: parseFloat(e.target.value) || 1.0 };
-                      setLocalSettings(prev => ({
-                        ...prev,
-                        laborFactors: {
-                          ...prev.laborFactors,
-                          roofPitchCategories: newCategories
-                        }
-                      }));
-                    }}
-                    className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <span className="ml-3 text-sm text-gray-500">
-                    {cat.laborFactor > 1 ? `+${Math.round((cat.laborFactor - 1) * 100)}%` : 'Standard'}
-                  </span>
+        <div className="space-y-6">
+          {Object.entries(LABOR_FACTOR_CONFIG).map(([factorType, config]) => {
+            const IconComponent = config.icon;
+            const factors = localSettings.laborFactors?.[factorType] || DEFAULT_SETTINGS.laborFactors?.[factorType] || [];
+
+            return (
+              <div key={factorType}>
+                <div className="flex items-center space-x-2 mb-3">
+                  <IconComponent className="h-4 w-4 text-gray-500" />
+                  <h4 className="text-sm font-medium text-gray-700">{config.label}</h4>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  {config.description}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {factors.map((factor, index) => (
+                    <div key={factor.id} className="bg-gray-50 rounded-lg p-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {factor.label}
+                      </label>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          min="1"
+                          max="3"
+                          step="0.05"
+                          value={factor.laborFactor}
+                          onChange={(e) => {
+                            const currentFactors = localSettings.laborFactors?.[factorType] || DEFAULT_SETTINGS.laborFactors?.[factorType] || [];
+                            const newFactors = [...currentFactors];
+                            newFactors[index] = { ...factor, laborFactor: parseFloat(e.target.value) || 1.0 };
+                            setLocalSettings(prev => ({
+                              ...prev,
+                              laborFactors: {
+                                ...prev.laborFactors,
+                                [factorType]: newFactors
+                              }
+                            }));
+                          }}
+                          className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <span className="ml-3 text-sm text-gray-500">
+                          {factor.laborFactor > 1 ? `+${Math.round((factor.laborFactor - 1) * 100)}%` : 'Standard'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
-        {/* Kabelweg */}
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <Cable className="h-4 w-4 text-gray-500" />
-            <h4 className="text-sm font-medium text-gray-700">Kabelweg (Elektroinstallation)</h4>
-          </div>
-          <p className="text-xs text-gray-500 mb-3">
-            Je länger der Kabelweg, desto mehr Arbeitszeit für die Elektroinstallation
+        {/* Info-Box */}
+        <div className="mt-6 p-4 bg-amber-50 rounded-lg text-sm">
+          <p className="text-amber-800">
+            <strong>Zuordnung:</strong> Dach → PV-Montage, Elektro → Elektroinstallation, Gerüst → Gerüstarbeiten, Fahrt → alle Leistungen
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(localSettings.laborFactors?.cableLengthCategories || DEFAULT_CABLE_LENGTH_CATEGORIES).map((cat, index) => (
-              <div key={cat.id} className="bg-gray-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {cat.label}
-                </label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    min="1"
-                    max="3"
-                    step="0.05"
-                    value={cat.laborFactor}
-                    onChange={(e) => {
-                      const currentCategories = localSettings.laborFactors?.cableLengthCategories || DEFAULT_CABLE_LENGTH_CATEGORIES;
-                      const newCategories = [...currentCategories];
-                      newCategories[index] = { ...cat, laborFactor: parseFloat(e.target.value) || 1.0 };
-                      setLocalSettings(prev => ({
-                        ...prev,
-                        laborFactors: {
-                          ...prev.laborFactors,
-                          cableLengthCategories: newCategories
-                        }
-                      }));
-                    }}
-                    className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <span className="ml-3 text-sm text-gray-500">
-                    {cat.laborFactor > 1 ? `+${Math.round((cat.laborFactor - 1) * 100)}%` : 'Standard'}
-                  </span>
-                </div>
-              </div>
-            ))}
+        </div>
+      </div>
+
+      {/* Mengenstaffel */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <TrendingDown className="h-5 w-5 text-green-600" />
+            <h3 className="text-base font-medium text-gray-900">Mengenstaffel (Arbeitszeit)</h3>
           </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={localSettings.quantityScales?.enabled || false}
+              onChange={(e) => {
+                setLocalSettings(prev => ({
+                  ...prev,
+                  quantityScales: {
+                    ...prev.quantityScales,
+                    enabled: e.target.checked
+                  }
+                }));
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+          </label>
         </div>
 
-        {/* PV Layout */}
-        <div className="mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <LayoutGrid className="h-4 w-4 text-gray-500" />
-            <h4 className="text-sm font-medium text-gray-700">PV Layout (Planungsaufwand)</h4>
-          </div>
-          <p className="text-xs text-gray-500 mb-3">
-            Komplexere Dachlayouts erfordern mehr Planungs- und Montagezeit
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(localSettings.laborFactors?.pvLayoutCategories || DEFAULT_PV_LAYOUT_CATEGORIES).map((cat, index) => (
-              <div key={cat.id} className="bg-gray-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {cat.label}
-                </label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    min="1"
-                    max="3"
-                    step="0.05"
-                    value={cat.laborFactor}
-                    onChange={(e) => {
-                      const currentCategories = localSettings.laborFactors?.pvLayoutCategories || DEFAULT_PV_LAYOUT_CATEGORIES;
-                      const newCategories = [...currentCategories];
-                      newCategories[index] = { ...cat, laborFactor: parseFloat(e.target.value) || 1.0 };
-                      setLocalSettings(prev => ({
-                        ...prev,
-                        laborFactors: {
-                          ...prev.laborFactors,
-                          pvLayoutCategories: newCategories
-                        }
-                      }));
-                    }}
-                    className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <span className="ml-3 text-sm text-gray-500">
-                    {cat.laborFactor > 1 ? `+${Math.round((cat.laborFactor - 1) * 100)}%` : 'Standard'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          Staffelrabatte auf Arbeitszeit basierend auf der Anzahl der Module im Angebot (nur PV-Montage).
+        </p>
 
-        {/* Anfahrt */}
-        <div>
-          <div className="flex items-center space-x-2 mb-3">
-            <Car className="h-4 w-4 text-gray-500" />
-            <h4 className="text-sm font-medium text-gray-700">Anfahrt (Entfernung)</h4>
+        {localSettings.quantityScales?.enabled && (
+          <div className="space-y-4">
+            {/* Staffelgrenzen als editierbare Tabelle */}
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Von (Module)</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Bis (Module)</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Rabatt auf Arbeitszeit</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Bezeichnung</th>
+                    <th className="px-4 py-3 w-12"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(localSettings.quantityScales?.tiers || []).map((tier, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <input
+                          type="number"
+                          min="1"
+                          value={tier.minQuantity}
+                          onChange={(e) => {
+                            const newTiers = [...(localSettings.quantityScales?.tiers || [])];
+                            newTiers[index] = { ...tier, minQuantity: parseInt(e.target.value) || 1 };
+                            setLocalSettings(prev => ({
+                              ...prev,
+                              quantityScales: { ...prev.quantityScales, tiers: newTiers }
+                            }));
+                          }}
+                          className="w-20 border border-gray-300 rounded px-2 py-1 text-center focus:ring-2 focus:ring-green-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="number"
+                          min="1"
+                          value={tier.maxQuantity || ''}
+                          placeholder="∞"
+                          onChange={(e) => {
+                            const newTiers = [...(localSettings.quantityScales?.tiers || [])];
+                            const val = e.target.value ? parseInt(e.target.value) : null;
+                            newTiers[index] = { ...tier, maxQuantity: val };
+                            setLocalSettings(prev => ({
+                              ...prev,
+                              quantityScales: { ...prev.quantityScales, tiers: newTiers }
+                            }));
+                          }}
+                          className="w-20 border border-gray-300 rounded px-2 py-1 text-center focus:ring-2 focus:ring-green-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center">
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            value={tier.laborDiscount}
+                            onChange={(e) => {
+                              const newTiers = [...(localSettings.quantityScales?.tiers || [])];
+                              newTiers[index] = { ...tier, laborDiscount: parseFloat(e.target.value) || 0 };
+                              setLocalSettings(prev => ({
+                                ...prev,
+                                quantityScales: { ...prev.quantityScales, tiers: newTiers }
+                              }));
+                            }}
+                            className="w-16 border border-gray-300 rounded px-2 py-1 text-center focus:ring-2 focus:ring-green-500"
+                          />
+                          <span className="ml-2 text-gray-500">%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input
+                          type="text"
+                          value={tier.label}
+                          onChange={(e) => {
+                            const newTiers = [...(localSettings.quantityScales?.tiers || [])];
+                            newTiers[index] = { ...tier, label: e.target.value };
+                            setLocalSettings(prev => ({
+                              ...prev,
+                              quantityScales: { ...prev.quantityScales, tiers: newTiers }
+                            }));
+                          }}
+                          className="w-full border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => {
+                            const newTiers = (localSettings.quantityScales?.tiers || []).filter((_, i) => i !== index);
+                            setLocalSettings(prev => ({
+                              ...prev,
+                              quantityScales: { ...prev.quantityScales, tiers: newTiers }
+                            }));
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                          title="Staffel entfernen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Staffel hinzufügen Button */}
+            <button
+              onClick={() => {
+                const currentTiers = localSettings.quantityScales?.tiers || [];
+                const lastTier = currentTiers[currentTiers.length - 1];
+                const newMin = lastTier ? (lastTier.maxQuantity || lastTier.minQuantity) + 1 : 1;
+                const newTier = {
+                  minQuantity: newMin,
+                  maxQuantity: null,
+                  laborDiscount: 0,
+                  label: `${newMin}+ Module`
+                };
+                setLocalSettings(prev => ({
+                  ...prev,
+                  quantityScales: {
+                    ...prev.quantityScales,
+                    tiers: [...currentTiers, newTier]
+                  }
+                }));
+              }}
+              className="flex items-center px-4 py-2 text-green-600 hover:bg-green-50 rounded-lg border border-dashed border-green-300"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Staffel hinzufügen
+            </button>
+
+            {/* Info-Box */}
+            <div className="bg-green-50 rounded-lg p-4 text-sm">
+              <p className="text-green-800">
+                <strong>Beispiel:</strong> Bei 25 Modulen und einer Staffel "21-30 Module: 10%" wird die Arbeitszeit
+                für PV-Montage-Positionen um 10% reduziert. Der Staffelrabatt wird automatisch bei der
+                Angebotserstellung angewendet.
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 mb-3">
-            Weitere Anfahrtswege erhöhen die Gesamtkosten
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(localSettings.laborFactors?.travelCategories || DEFAULT_TRAVEL_CATEGORIES).map((cat, index) => (
-              <div key={cat.id} className="bg-gray-50 rounded-lg p-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {cat.label}
-                </label>
-                <div className="flex items-center">
-                  <input
-                    type="number"
-                    min="1"
-                    max="3"
-                    step="0.05"
-                    value={cat.laborFactor}
-                    onChange={(e) => {
-                      const currentCategories = localSettings.laborFactors?.travelCategories || DEFAULT_TRAVEL_CATEGORIES;
-                      const newCategories = [...currentCategories];
-                      newCategories[index] = { ...cat, laborFactor: parseFloat(e.target.value) || 1.0 };
-                      setLocalSettings(prev => ({
-                        ...prev,
-                        laborFactors: {
-                          ...prev.laborFactors,
-                          travelCategories: newCategories
-                        }
-                      }));
-                    }}
-                    className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <span className="ml-3 text-sm text-gray-500">
-                    {cat.laborFactor > 1 ? `+${Math.round((cat.laborFactor - 1) * 100)}%` : 'Standard'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Steuereinstellungen */}

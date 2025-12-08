@@ -237,6 +237,11 @@ const ServiceCatalog = () => {
                               <h4 className="font-medium text-gray-900 truncate">
                                 {service.name}
                               </h4>
+                              {service.isDefaultPosition && (
+                                <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">
+                                  Pflichtposition
+                                </span>
+                              )}
                               {!service.isActive && (
                                 <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-600 rounded">
                                   Inaktiv

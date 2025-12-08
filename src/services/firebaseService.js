@@ -48,7 +48,8 @@ export const COLLECTIONS = {
   CALCULATION_SETTINGS: 'calculation-settings',
   SERVICE_CATALOG: 'service-catalog',
   OFFERS: 'offers',
-  OFFER_TEMPLATES: 'offer-templates'
+  OFFER_TEMPLATES: 'offer-templates',
+  INVOICES: 'invoices'
 };
 
 // Generic CRUD Operations
@@ -452,6 +453,74 @@ export class OfferService {
       console.error('Error generating offer number:', error);
       const timestamp = Date.now();
       return `ANG-${new Date().getFullYear()}-${timestamp}`;
+    }
+  }
+}
+
+// Invoice Service
+export class InvoiceService {
+  static async getAllInvoices() {
+    return FirebaseService.getDocuments(COLLECTIONS.INVOICES, 'createdAt');
+  }
+
+  static async getInvoice(invoiceId) {
+    return FirebaseService.getDocument(COLLECTIONS.INVOICES, invoiceId);
+  }
+
+  static async addInvoice(invoiceData) {
+    return FirebaseService.addDocument(COLLECTIONS.INVOICES, invoiceData);
+  }
+
+  static async updateInvoice(invoiceId, invoiceData) {
+    return FirebaseService.updateDocument(COLLECTIONS.INVOICES, invoiceId, invoiceData);
+  }
+
+  static async deleteInvoice(invoiceId) {
+    return FirebaseService.deleteDocument(COLLECTIONS.INVOICES, invoiceId);
+  }
+
+  static subscribeToInvoices(callback) {
+    return FirebaseService.subscribeToCollection(COLLECTIONS.INVOICES, callback, 'createdAt');
+  }
+
+  static async getInvoicesByCustomer(customerId) {
+    return FirebaseService.queryDocuments(COLLECTIONS.INVOICES, 'customerID', '==', customerId);
+  }
+
+  static async getInvoicesByOffer(offerId) {
+    return FirebaseService.queryDocuments(COLLECTIONS.INVOICES, 'offerID', '==', offerId);
+  }
+
+  static async getInvoicesByStatus(status) {
+    return FirebaseService.queryDocuments(COLLECTIONS.INVOICES, 'status', '==', status);
+  }
+
+  static async getNextInvoiceNumber() {
+    try {
+      const currentYear = new Date().getFullYear();
+      const invoices = await this.getAllInvoices();
+
+      // Filter invoices from current year and find highest number
+      const yearInvoices = invoices.filter(i => {
+        const invoiceYear = i.invoiceNumber?.match(/\d{4}/)?.[0];
+        return invoiceYear === String(currentYear);
+      });
+
+      let maxNumber = 0;
+      yearInvoices.forEach(i => {
+        const match = i.invoiceNumber?.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNumber) maxNumber = num;
+        }
+      });
+
+      const nextNumber = String(maxNumber + 1).padStart(4, '0');
+      return `RE-${currentYear}-${nextNumber}`;
+    } catch (error) {
+      console.error('Error generating invoice number:', error);
+      const timestamp = Date.now();
+      return `RE-${new Date().getFullYear()}-${timestamp}`;
     }
   }
 }

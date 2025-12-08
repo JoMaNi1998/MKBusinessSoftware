@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   ShoppingCart,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Receipt
 } from 'lucide-react';
 import UserAvatar from './UserAvatar';
 import { useRoleSafe } from '../context/RoleContext';
@@ -29,6 +30,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     { name: 'VDE Protokolle', href: '/vde-protocols', icon: FileText, permission: 'vde' },
     { name: 'PV Konfigurator', href: '/pv-configurator', icon: Home, permission: 'pv-configurator' },
     { name: 'Angebote', href: '/offers', icon: FileSpreadsheet, permission: 'pv-configurator' },
+    { name: 'Rechnungen', href: '/invoices', icon: Receipt, permission: 'pv-configurator' },
     { name: 'Einstellungen', href: '/settings', icon: Settings, permission: 'settings' },
   ];
 

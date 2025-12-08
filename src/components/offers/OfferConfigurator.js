@@ -16,7 +16,18 @@ import {
   Save,
   Send,
   Download,
-  Eye
+  Eye,
+  TrendingDown,
+  Minus,
+  Layers,
+  RefreshCcw,
+  Zap,
+  Battery,
+  Car,
+  Power,
+  Target,
+  Cpu,
+  Sun
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useOffers, OFFER_STATUS } from '../../context/OfferContext';
@@ -27,13 +38,14 @@ import { useProjects } from '../../context/ProjectContext';
 import { useMaterials } from '../../context/MaterialContext';
 import { useNotification } from '../../context/NotificationContext';
 import BaseModal from '../BaseModal';
+import { OFFER_STATUS_LABELS } from '../../context/OfferContext';
 
-// Wizard Steps - Kunde/Projekt am Ende (wie PVConfigurator)
+// Wizard Steps - Kunde/Projekt am Anfang
 const STEPS = [
-  { id: 0, title: 'Leistungen', icon: Package },
-  { id: 1, title: 'Positionen', icon: Edit },
-  { id: 2, title: 'Konditionen', icon: FileText },
-  { id: 3, title: 'Abschluss', icon: CheckCircle }
+  { id: 0, title: 'Kunde', icon: Users },
+  { id: 1, title: 'Leistungen', icon: Package },
+  { id: 2, title: 'Positionen', icon: Edit },
+  { id: 3, title: 'Vorschau', icon: Eye }
 ];
 
 const OfferConfigurator = () => {
@@ -42,7 +54,7 @@ const OfferConfigurator = () => {
   const isEditing = !!offerId;
 
   const { createOffer, updateOffer, getOfferById } = useOffers();
-  const { activeServices, getServicesByCategory } = useServiceCatalog();
+  const { activeServices, defaultServices, getServicesByCategory } = useServiceCatalog();
   const { calculateOfferTotals, calculateValidUntil, settings: calcSettings } = useCalculation();
   const { customers } = useCustomers();
   const { projects } = useProjects();
@@ -65,7 +77,7 @@ const OfferConfigurator = () => {
       discountPercent: 0,
       discountAmount: 0,
       netTotal: 0,
-      taxRate: 19,
+      taxRate: 0,
       taxAmount: 0,
       grossTotal: 0
     },
@@ -74,64 +86,77 @@ const OfferConfigurator = () => {
       paymentTerms: '',
       deliveryTerms: '',
       notes: ''
-    }
+    },
+    depositPercent: 50
   });
 
   const [validationErrors, setValidationErrors] = useState({});
 
-  // Arbeitszeitfaktoren für Preisanpassungen - Standard als Default
-  const [roofPitchCategory, setRoofPitchCategory] = useState('standard');
-  const [cableLengthCategory, setCableLengthCategory] = useState('standard');
-  const [pvLayoutCategory, setPvLayoutCategory] = useState('standard');
-  const [travelCategory, setTravelCategory] = useState('standard');
+  // Arbeitszeitfaktoren pro Gewerk (vereinfacht)
+  const [laborFactorSelections, setLaborFactorSelections] = useState({
+    dach: 'normal',
+    elektro: 'normal',
+    geruest: 'normal',
+    fahrt: 'normal'
+  });
 
-  // Kategorien aus CalculationContext (calcSettings.laborFactors)
-  const roofPitchCategories = calcSettings.laborFactors?.roofPitchCategories || [
-    { id: 'standard', label: 'Standard (0-25°)', laborFactor: 1.0 },
-    { id: 'medium', label: 'Mittel (25-35°)', laborFactor: 1.15 },
-    { id: 'steep', label: 'Steil (>35°)', laborFactor: 1.30 }
-  ];
+  // Labels für Arbeitszeitfaktoren
+  const LABOR_FACTOR_LABELS = {
+    dach: 'Dach',
+    elektro: 'Elektro',
+    geruest: 'Gerüst',
+    fahrt: 'Fahrt'
+  };
 
-  const cableLengthCategories = calcSettings.laborFactors?.cableLengthCategories || [
-    { id: 'standard', label: 'Standard (<15m)', laborFactor: 1.0 },
-    { id: 'medium', label: 'Mittel (15-30m)', laborFactor: 1.20 },
-    { id: 'long', label: 'Lang (>30m)', laborFactor: 1.40 }
-  ];
-
-  const pvLayoutCategories = calcSettings.laborFactors?.pvLayoutCategories || [
-    { id: 'standard', label: 'Standard (einfach)', laborFactor: 1.0 },
-    { id: 'medium', label: 'Mittel (mehrere Flächen)', laborFactor: 1.15 },
-    { id: 'complex', label: 'Komplex (Gauben/Verschattung)', laborFactor: 1.30 }
-  ];
-
-  const travelCategories = calcSettings.laborFactors?.travelCategories || [
-    { id: 'standard', label: 'Standard (<30km)', laborFactor: 1.0 },
-    { id: 'medium', label: 'Mittel (30-60km)', laborFactor: 1.15 },
-    { id: 'far', label: 'Weit (>60km)', laborFactor: 1.30 }
-  ];
-
-  // Hilfsfunktionen für Faktor-Lookup
-  const getRoofPitchFactor = useCallback(() => {
-    const cat = roofPitchCategories.find(c => c.id === roofPitchCategory);
-    return cat?.laborFactor || 1.0;
-  }, [roofPitchCategory, roofPitchCategories]);
-
-  const getCableLengthFactor = useCallback(() => {
-    const cat = cableLengthCategories.find(c => c.id === cableLengthCategory);
-    return cat?.laborFactor || 1.0;
-  }, [cableLengthCategory, cableLengthCategories]);
-
-  const getPvLayoutFactor = useCallback(() => {
-    const cat = pvLayoutCategories.find(c => c.id === pvLayoutCategory);
-    return cat?.laborFactor || 1.0;
-  }, [pvLayoutCategory, pvLayoutCategories]);
-
-  const getTravelFactor = useCallback(() => {
-    const cat = travelCategories.find(c => c.id === travelCategory);
-    return cat?.laborFactor || 1.0;
-  }, [travelCategory, travelCategories]);
+  // Generische Faktor-Lookup Funktion
+  const getLaborFactor = useCallback((factorType) => {
+    const factors = calcSettings.laborFactors?.[factorType] || [];
+    const selected = laborFactorSelections[factorType];
+    const factor = factors.find(f => f.id === selected);
+    return factor?.laborFactor || 1.0;
+  }, [laborFactorSelections, calcSettings.laborFactors]);
 
   const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+
+  // Dropdown-basierte Auswahl für Hauptkategorien
+  const [selectedServices, setSelectedServices] = useState({
+    module: '',
+    wechselrichter: '',
+    speicher: '',
+    wallbox: '',
+    notstrom: '',
+    optimierer: '',
+    energiemanagement: ''
+  });
+
+  const [serviceQuantities, setServiceQuantities] = useState({
+    module: 10,
+    wechselrichter: 1,
+    speicher: 1,
+    wallbox: 1,
+    notstrom: 1,
+    optimierer: 0,
+    energiemanagement: 1
+  });
+
+  // Dropdown-Kategorien (nur Kategorien mit isDropdown=true)
+  const dropdownCategories = SERVICE_CATEGORIES.filter(c => c.isDropdown);
+
+  // Icon-Mapping für Dropdown-Kategorien
+  const CATEGORY_ICONS = {
+    Sun, Zap, Battery, Car, Power, Target, Cpu
+  };
+
+  // Service-Name anhand ID finden
+  const getServiceById = useCallback((serviceId) => {
+    return activeServices.find(s => s.id === serviceId);
+  }, [activeServices]);
+
+  // Ausgewählten Service für Kategorie holen
+  const getSelectedService = useCallback((categoryId) => {
+    const serviceId = selectedServices[categoryId];
+    return serviceId ? getServiceById(serviceId) : null;
+  }, [selectedServices, getServiceById]);
 
   // Bestehendes Angebot laden
   useEffect(() => {
@@ -160,6 +185,44 @@ const OfferConfigurator = () => {
     }
   }, [isEditing, offerId, getOfferById, calculateValidUntil, calcSettings]);
 
+  // Pflichtpositionen automatisch hinzufügen bei neuen Angeboten
+  useEffect(() => {
+    if (!isEditing && offerData.items.length === 0 && defaultServices.length > 0) {
+      const defaultItems = defaultServices.map((service, index) => ({
+        id: `item-${Date.now()}-${index}`,
+        position: index + 1,
+        type: 'service',
+        serviceID: service.id,
+        category: service.category,
+        shortText: service.shortText,
+        longText: service.longText,
+        quantity: service.defaultQuantity || 1,
+        unit: service.unit,
+        unitPriceNet: service.calculatedPrices?.unitPriceNet || 0,
+        originalUnitPrice: service.calculatedPrices?.unitPriceNet || 0,
+        priceOverridden: false,
+        discount: 0,
+        totalNet: (service.defaultQuantity || 1) * (service.calculatedPrices?.unitPriceNet || 0),
+        isDefaultPosition: true,
+        breakdown: {
+          materials: service.materials,
+          labor: service.labor,
+          materialCost: service.calculatedPrices?.materialCostVK || 0,
+          laborCost: service.calculatedPrices?.laborCost || 0
+        }
+      }));
+
+      setOfferData(prev => ({
+        ...prev,
+        items: defaultItems
+      }));
+
+      if (defaultItems.length > 0) {
+        showNotification(`${defaultItems.length} Pflichtposition(en) hinzugefügt`, 'info');
+      }
+    }
+  }, [isEditing, defaultServices, showNotification]);
+
   // Gefilterte Projekte für ausgewählten Kunden
   const customerProjects = useMemo(() => {
     if (!selectedCustomer) return [];
@@ -184,11 +247,15 @@ const OfferConfigurator = () => {
     return grouped;
   }, [activeServices, serviceSearchTerm]);
 
-  // Totals neu berechnen wenn Items ändern
+  // Totals neu berechnen wenn Items oder TaxRate ändern
   useEffect(() => {
-    const totals = calculateOfferTotals(offerData.items, offerData.totals?.discountPercent || 0);
-    setOfferData(prev => ({ ...prev, totals }));
-  }, [offerData.items, offerData.totals?.discountPercent, calculateOfferTotals]);
+    const totals = calculateOfferTotals(
+      offerData.items,
+      offerData.totals?.discountPercent || 0,
+      offerData.totals?.taxRate ?? 0
+    );
+    setOfferData(prev => ({ ...prev, totals: { ...totals, taxRate: prev.totals?.taxRate ?? 0 } }));
+  }, [offerData.items, offerData.totals?.discountPercent, offerData.totals?.taxRate, calculateOfferTotals]);
 
   // Leistung zum Angebot hinzufügen
   const handleAddService = (service) => {
@@ -196,25 +263,26 @@ const OfferConfigurator = () => {
     let laborFactor = 1.0;
     const appliedFactors = {};
 
-    // Dachneigung für PV-Montage
+    // Faktor basierend auf Service-Kategorie
     if (service.category === 'pv-montage') {
-      const roofFactor = getRoofPitchFactor();
-      const pvLayoutFactor = getPvLayoutFactor();
-      laborFactor = roofFactor * pvLayoutFactor;
-      if (roofFactor > 1) appliedFactors.roofPitch = roofFactor;
-      if (pvLayoutFactor > 1) appliedFactors.pvLayout = pvLayoutFactor;
-    }
-    // Kabelweg für Elektroinstallation
-    else if (service.category === 'elektroinstallation') {
-      laborFactor = getCableLengthFactor();
-      if (laborFactor > 1) appliedFactors.cableLength = laborFactor;
+      const dachFactor = getLaborFactor('dach');
+      laborFactor = dachFactor;
+      if (dachFactor > 1) appliedFactors.dach = dachFactor;
+    } else if (service.category === 'elektroinstallation') {
+      const elektroFactor = getLaborFactor('elektro');
+      laborFactor = elektroFactor;
+      if (elektroFactor > 1) appliedFactors.elektro = elektroFactor;
+    } else if (service.category === 'geruest') {
+      const geruestFactor = getLaborFactor('geruest');
+      laborFactor = geruestFactor;
+      if (geruestFactor > 1) appliedFactors.geruest = geruestFactor;
     }
 
-    // Anfahrt gilt für alle Leistungen
-    const travelFactor = getTravelFactor();
-    if (travelFactor > 1) {
-      laborFactor *= travelFactor;
-      appliedFactors.travel = travelFactor;
+    // Fahrt gilt für alle Leistungen
+    const fahrtFactor = getLaborFactor('fahrt');
+    if (fahrtFactor > 1) {
+      laborFactor *= fahrtFactor;
+      appliedFactors.fahrt = fahrtFactor;
     }
 
     // Preise mit Faktor anpassen
@@ -316,20 +384,153 @@ const OfferConfigurator = () => {
     }));
   };
 
+  // Dropdown-Service-Auswahl mit Ersetzungs-Logik
+  const handleServiceSelection = useCallback((categoryId, serviceId) => {
+    setSelectedServices(prev => ({ ...prev, [categoryId]: serviceId }));
+
+    if (!serviceId) return;
+
+    const selectedService = getServiceById(serviceId);
+    if (!selectedService) return;
+
+    // Ersetzungs-Logik anwenden
+    if (selectedService.replaces?.length > 0) {
+      setOfferData(prev => {
+        let removedCount = 0;
+        const newItems = prev.items
+          .map(item => {
+            // Aus Paket-Unterleistungen entfernen
+            if (item.isPackage && item.subItems?.length > 0) {
+              const originalSubCount = item.subItems.length;
+              const filteredSubItems = item.subItems.filter(
+                sub => !selectedService.replaces.includes(sub.serviceId)
+              );
+              if (filteredSubItems.length < originalSubCount) {
+                removedCount += originalSubCount - filteredSubItems.length;
+                return { ...item, subItems: filteredSubItems };
+              }
+            }
+            return item;
+          })
+          .filter(item => {
+            const shouldRemove = selectedService.replaces.includes(item.serviceID);
+            if (shouldRemove) removedCount++;
+            return !shouldRemove;
+          })
+          .map((item, index) => ({ ...item, position: index + 1 }));
+
+        if (removedCount > 0) {
+          showNotification(`${removedCount} Position(en) ersetzt durch ${selectedService.name}`, 'info');
+        }
+
+        return { ...prev, items: newItems };
+      });
+    }
+  }, [getServiceById, showNotification]);
+
+  // Dropdown-Menge ändern
+  const handleQuantityChange = useCallback((categoryId, delta) => {
+    setServiceQuantities(prev => ({
+      ...prev,
+      [categoryId]: Math.max(0, (prev[categoryId] || 0) + delta)
+    }));
+  }, []);
+
+  // Synchronisiere Dropdown-Auswahl mit Items
+  useEffect(() => {
+    // Nur bei neuen Angeboten automatisch synchronisieren
+    if (isEditing) return;
+
+    const newItems = [];
+
+    Object.entries(selectedServices).forEach(([categoryId, serviceId]) => {
+      if (!serviceId || serviceQuantities[categoryId] <= 0) return;
+
+      const service = getServiceById(serviceId);
+      if (!service) return;
+
+      // Prüfen ob bereits hinzugefügt (als dropdown-item)
+      const existingItem = offerData.items.find(
+        item => item.serviceID === serviceId && item.sourceType === 'dropdown'
+      );
+
+      if (!existingItem) {
+        // Arbeitszeitfaktoren berechnen
+        let laborFactor = 1.0;
+        const appliedFactors = {};
+
+        const fahrtFactor = getLaborFactor('fahrt');
+        if (fahrtFactor > 1) {
+          laborFactor *= fahrtFactor;
+          appliedFactors.fahrt = fahrtFactor;
+        }
+
+        const originalLaborCost = service.calculatedPrices?.laborCost || 0;
+        const adjustedLaborCost = originalLaborCost * laborFactor;
+        const materialCost = service.calculatedPrices?.materialCostVK || 0;
+        const originalUnitPrice = service.calculatedPrices?.unitPriceNet || 0;
+        const laborDiff = adjustedLaborCost - originalLaborCost;
+        const adjustedUnitPrice = originalUnitPrice + laborDiff;
+        const quantity = serviceQuantities[categoryId];
+
+        newItems.push({
+          id: `item-dropdown-${categoryId}-${serviceId}`,
+          position: 0, // Position wird später gesetzt
+          type: 'service',
+          sourceType: 'dropdown',
+          serviceID: serviceId,
+          category: categoryId,
+          shortText: service.shortText,
+          longText: service.longText,
+          quantity: quantity,
+          unit: service.unit,
+          unitPriceNet: adjustedUnitPrice,
+          originalUnitPrice: originalUnitPrice,
+          priceOverridden: laborFactor !== 1.0,
+          discount: 0,
+          totalNet: quantity * adjustedUnitPrice,
+          laborFactor: laborFactor,
+          appliedFactors: appliedFactors,
+          isPackage: service.isPackage,
+          subItems: service.subItems,
+          breakdown: {
+            materials: service.materials,
+            labor: service.labor,
+            materialCost: materialCost,
+            laborCost: adjustedLaborCost,
+            originalLaborCost: originalLaborCost
+          }
+        });
+      }
+    });
+
+    if (newItems.length > 0) {
+      setOfferData(prev => {
+        // Bestehende Dropdown-Items entfernen und neue hinzufügen
+        const nonDropdownItems = prev.items.filter(item => item.sourceType !== 'dropdown');
+        const allItems = [...nonDropdownItems, ...newItems].map((item, index) => ({
+          ...item,
+          position: index + 1
+        }));
+        return { ...prev, items: allItems };
+      });
+    }
+  }, [selectedServices, serviceQuantities, getServiceById, getLaborFactor, isEditing]);
+
   // Validierung
   const validateStep = (step) => {
     const errors = {};
 
     switch (step) {
-      case 0: // Leistungen
+      case 0: // Kunde
+        if (!selectedCustomer) errors.customer = 'Bitte Kunde auswählen';
+        break;
+      case 1: // Leistungen
         if (offerData.items.length === 0) errors.items = 'Mindestens eine Position erforderlich';
         break;
-      case 1: // Positionen - keine Validierung nötig
+      case 2: // Positionen - keine Validierung nötig
         break;
-      case 2: // Konditionen - keine Validierung nötig
-        break;
-      case 3: // Abschluss
-        if (!selectedCustomer) errors.customer = 'Bitte Kunde auswählen';
+      case 3: // Vorschau - keine Validierung nötig
         break;
       default:
         break;
@@ -393,180 +594,269 @@ const OfferConfigurator = () => {
     }).format(price || 0);
   };
 
-  // Step 0: Leistungen auswählen
-  const renderServicesStep = () => (
-    <div className="space-y-6">
-      {/* Arbeitszeitfaktoren */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <h4 className="font-medium text-amber-900 mb-3">Arbeitszeitfaktoren</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Dachneigung */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Dachneigung
-            </label>
-            <select
-              value={roofPitchCategory}
-              onChange={(e) => setRoofPitchCategory(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              {roofPitchCategories.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.label} {cat.laborFactor > 1 ? `(+${Math.round((cat.laborFactor - 1) * 100)}%)` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+  // Step 0: Leistungen auswählen (Dropdown-basiert)
+  const renderServicesStep = () => {
+    // Services nach Kategorie für Dropdowns
+    const getServicesForCategory = (categoryId) => {
+      return activeServices.filter(s => s.category === categoryId);
+    };
 
-          {/* Kabelweg */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Kabelweg
-            </label>
-            <select
-              value={cableLengthCategory}
-              onChange={(e) => setCableLengthCategory(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              {cableLengthCategories.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.label} {cat.laborFactor > 1 ? `(+${Math.round((cat.laborFactor - 1) * 100)}%)` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+    // Icon für Kategorie holen
+    const getCategoryIcon = (iconName) => {
+      const IconComponent = CATEGORY_ICONS[iconName];
+      return IconComponent ? <IconComponent className="h-5 w-5" /> : <Package className="h-5 w-5" />;
+    };
 
-          {/* PV Layout */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              PV Layout
-            </label>
-            <select
-              value={pvLayoutCategory}
-              onChange={(e) => setPvLayoutCategory(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              {pvLayoutCategories.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.label} {cat.laborFactor > 1 ? `(+${Math.round((cat.laborFactor - 1) * 100)}%)` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Anfahrt */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Anfahrt
-            </label>
-            <select
-              value={travelCategory}
-              onChange={(e) => setTravelCategory(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              {travelCategories.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.label} {cat.laborFactor > 1 ? `(+${Math.round((cat.laborFactor - 1) * 100)}%)` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <p className="text-xs text-gray-600 mt-2">Faktoren beeinflussen die Arbeitszeit je nach Leistungskategorie</p>
-      </div>
-
-      {/* Suche */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          value={serviceSearchTerm}
-          onChange={(e) => setServiceSearchTerm(e.target.value)}
-          placeholder="Leistungen suchen..."
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {validationErrors.items && (
-        <div className="flex items-center space-x-2 text-red-500 text-sm">
-          <AlertCircle className="h-4 w-4" />
-          <span>{validationErrors.items}</span>
-        </div>
-      )}
-
-      {/* Hinzugefügte Positionen */}
-      {offerData.items.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-medium text-blue-900">
-              {offerData.items.length} Position(en) hinzugefügt
-            </span>
-            <span className="text-blue-700 font-bold">
-              {formatPrice(offerData.totals?.netTotal)}
-            </span>
-          </div>
-          <div className="text-sm text-blue-700">
-            {offerData.items.map(item => item.shortText).join(', ').substring(0, 100)}
-            {offerData.items.map(item => item.shortText).join(', ').length > 100 && '...'}
-          </div>
-        </div>
-      )}
-
-      {/* Leistungskatalog */}
-      <div className="space-y-4">
-        {SERVICE_CATEGORIES.map(category => {
-          const categoryServices = filteredServicesByCategory[category.id] || [];
-          if (categoryServices.length === 0) return null;
-
-          return (
-            <div key={category.id} className="border rounded-lg overflow-hidden">
-              <div className="bg-gray-50 px-4 py-2 font-medium text-gray-700">
-                {category.label}
-              </div>
-              <div className="divide-y divide-gray-100">
-                {categoryServices.map(service => (
-                  <div
-                    key={service.id}
-                    className="px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+    return (
+      <div className="space-y-6">
+        {/* Arbeitszeitfaktoren */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h4 className="font-medium text-amber-900 mb-3">Arbeitszeitfaktoren</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {['dach', 'elektro', 'geruest', 'fahrt'].map(factorType => {
+              const factors = calcSettings.laborFactors?.[factorType] || [];
+              return (
+                <div key={factorType}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {LABOR_FACTOR_LABELS[factorType]}
+                  </label>
+                  <select
+                    value={laborFactorSelections[factorType]}
+                    onChange={(e) => setLaborFactorSelections(prev => ({
+                      ...prev,
+                      [factorType]: e.target.value
+                    }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                   >
-                    <div className="flex-1 min-w-0 mr-4">
-                      <p className="font-medium text-gray-900 truncate">{service.name}</p>
-                      <p className="text-sm text-gray-500 truncate">{service.shortText}</p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium text-gray-900">
-                        {formatPrice(service.calculatedPrices?.unitPriceNet)} / {service.unit}
-                      </span>
-                      <button
-                        onClick={() => handleAddService(service)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                      >
-                        <Plus className="h-5 w-5" />
-                      </button>
-                    </div>
+                    {factors.map(f => (
+                      <option key={f.id} value={f.id}>
+                        {f.label} {f.laborFactor > 1 ? `(+${Math.round((f.laborFactor - 1) * 100)}%)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-600 mt-2">Faktoren beeinflussen die Arbeitszeit je nach Leistungskategorie</p>
+        </div>
+
+        {validationErrors.items && (
+          <div className="flex items-center space-x-2 text-red-500 text-sm">
+            <AlertCircle className="h-4 w-4" />
+            <span>{validationErrors.items}</span>
+          </div>
+        )}
+
+        {/* Dropdown-Auswahl für Hauptkategorien */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="font-medium text-gray-900 mb-4">Leistungen konfigurieren</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {dropdownCategories.map(category => {
+              const categoryServices = getServicesForCategory(category.id);
+              const selectedService = getSelectedService(category.id);
+              const quantity = serviceQuantities[category.id] || 0;
+
+              return (
+                <div key={category.id} className="space-y-2">
+                  {/* Dropdown Label mit Icon */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-500">
+                      {getCategoryIcon(category.icon)}
+                    </span>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {category.label}
+                    </label>
                   </div>
-                ))}
-              </div>
+
+                  {/* Dropdown */}
+                  <select
+                    value={selectedServices[category.id] || ''}
+                    onChange={(e) => handleServiceSelection(category.id, e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Keine Auswahl</option>
+                    {categoryServices.map(svc => (
+                      <option key={svc.id} value={svc.id}>
+                        {svc.name} - {formatPrice(svc.calculatedPrices?.unitPriceNet)}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Mengen-Eingabe (wenn ausgewählt) */}
+                  {selectedServices[category.id] && (
+                    <div className="flex items-center space-x-3 mt-2">
+                      <span className="text-sm text-gray-600">Menge:</span>
+                      {category.id === 'module' ? (
+                        /* Direktes Eingabefeld für Module */
+                        <input
+                          type="number"
+                          min="1"
+                          value={quantity}
+                          onChange={(e) => {
+                            const newQty = parseInt(e.target.value) || 1;
+                            setServiceQuantities(prev => ({ ...prev, [category.id]: newQty }));
+                          }}
+                          className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:ring-2 focus:ring-blue-500"
+                        />
+                      ) : (
+                        /* Stepper für andere Kategorien */
+                        <div className="flex items-center border border-gray-300 rounded-lg">
+                          <button
+                            onClick={() => handleQuantityChange(category.id, -1)}
+                            className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-l-lg"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className="px-4 py-1 border-x border-gray-300 min-w-[40px] text-center">
+                            {quantity}
+                          </span>
+                          <button
+                            onClick={() => handleQuantityChange(category.id, 1)}
+                            className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-r-lg"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Paket-Inhalt anzeigen */}
+                  {selectedService?.isPackage && selectedService?.subItems?.length > 0 && (
+                    <div className="text-xs bg-purple-50 border border-purple-200 p-2 mt-2 rounded-lg">
+                      <div className="flex items-center text-purple-700 font-medium mb-1">
+                        <Layers className="h-3 w-3 mr-1" />
+                        Enthält:
+                      </div>
+                      <ul className="text-purple-600 space-y-0.5">
+                        {selectedService.subItems.map((sub, idx) => {
+                          const subService = getServiceById(sub.serviceId);
+                          return (
+                            <li key={idx}>• {subService?.name || sub.serviceId} (x{sub.quantity})</li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Ersetzungs-Hinweis */}
+                  {selectedService?.replaces?.length > 0 && (
+                    <div className="text-xs bg-orange-50 border border-orange-200 p-2 mt-2 rounded-lg flex items-start">
+                      <RefreshCcw className="h-3 w-3 mr-1 mt-0.5 text-orange-600 flex-shrink-0" />
+                      <span className="text-orange-700">
+                        Ersetzt: {selectedService.replaces.map(id => getServiceById(id)?.name || id).join(', ')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Hinzugefügte Positionen Übersicht */}
+        {offerData.items.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-blue-900">
+                {offerData.items.length} Position(en) hinzugefügt
+              </span>
+              <span className="text-blue-700 font-bold">
+                {formatPrice(offerData.totals?.netTotal)}
+              </span>
             </div>
-          );
-        })}
+            <div className="text-sm text-blue-700">
+              {offerData.items.map(item => item.shortText).join(', ').substring(0, 100)}
+              {offerData.items.map(item => item.shortText).join(', ').length > 100 && '...'}
+            </div>
+          </div>
+        )}
+
+        {/* Katalog-Kategorien (nicht-Dropdown) ausklappbar */}
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-gray-50 px-4 py-3">
+            <h4 className="font-medium text-gray-700">Weitere Leistungen aus dem Katalog</h4>
+            <p className="text-xs text-gray-500">PV-Montage, Elektroinstallation, Planung etc.</p>
+          </div>
+
+          {/* Suche für Katalog */}
+          <div className="px-4 py-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={serviceSearchTerm}
+                onChange={(e) => setServiceSearchTerm(e.target.value)}
+                placeholder="Leistungen suchen..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Katalog-Kategorien */}
+          <div className="divide-y divide-gray-100">
+            {SERVICE_CATEGORIES.filter(c => !c.isDropdown).map(category => {
+              const categoryServices = filteredServicesByCategory[category.id] || [];
+              if (categoryServices.length === 0) return null;
+
+              return (
+                <div key={category.id}>
+                  <div className="px-4 py-2 bg-gray-50 text-sm font-medium text-gray-600">
+                    {category.label}
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {categoryServices.map(service => (
+                      <div
+                        key={service.id}
+                        className="px-4 py-2 flex items-center justify-between hover:bg-gray-50"
+                      >
+                        <div className="flex-1 min-w-0 mr-4">
+                          <p className="text-sm font-medium text-gray-900 truncate">{service.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{service.shortText}</p>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-xs font-medium text-gray-700">
+                            {formatPrice(service.calculatedPrices?.unitPriceNet)} / {service.unit}
+                          </span>
+                          <button
+                            onClick={() => handleAddService(service)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
       </div>
+    );
+  };
 
-      {/* Manuelle Position */}
-      <button
-        onClick={handleAddManualItem}
-        className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 flex items-center justify-center"
-      >
-        <Plus className="h-5 w-5 mr-2" />
-        Manuelle Position hinzufügen
-      </button>
-    </div>
-  );
+  // Step 2: Positionen bearbeiten (PDF-Layout wie Vorschau)
+  const renderPositionsStep = () => {
+    const customer = customers.find(c => c.id === selectedCustomer);
+    const project = projects.find(p => p.id === selectedProject);
 
-  // Step 1: Positionen bearbeiten
-  const renderPositionsStep = () => (
-    <div className="space-y-6">
-      {offerData.items.length === 0 ? (
+    const formatDateLocal = (dateString) => {
+      if (!dateString) return '-';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('de-DE');
+      } catch {
+        return dateString;
+      }
+    };
+
+    if (offerData.items.length === 0) {
+      return (
         <div className="text-center py-12 text-gray-500">
           <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
           <p>Noch keine Positionen hinzugefügt</p>
@@ -577,312 +867,519 @@ const OfferConfigurator = () => {
             Leistungen hinzufügen
           </button>
         </div>
-      ) : (
-        <>
-          {/* Positionsliste */}
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase w-8">Pos</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Beschreibung</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase w-20">Menge</th>
-                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-16">Einheit</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase w-28">EP (netto)</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase w-16">Rabatt</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase w-28">Gesamt</th>
-                  <th className="px-3 py-2 w-10"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {offerData.items.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 text-gray-500">{item.position}</td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="text"
-                        value={item.shortText}
-                        onChange={(e) => handleUpdateItem(item.id, { shortText: e.target.value })}
-                        className="w-full border-0 bg-transparent focus:ring-0 p-0"
-                      />
-                      {item.laborFactor > 1 && (
-                        <span className="text-xs text-amber-600">
-                          +{Math.round((item.laborFactor - 1) * 100)}% Arbeitszeit
-                          ({item.appliedFactorType === 'roofPitch' ? 'Dachneigung' : 'Kabelweg'})
-                        </span>
-                      )}
-                      {item.priceOverridden && !item.laborFactor && (
-                        <span className="text-xs text-amber-600">Preis angepasst</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={item.quantity}
-                        onChange={(e) => handleUpdateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                        className="w-full text-right border border-gray-200 rounded px-2 py-1"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-center text-gray-600">{item.unit}</td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPriceNet}
-                        onChange={(e) => handleUpdateItem(item.id, { unitPriceNet: parseFloat(e.target.value) || 0 })}
-                        className="w-full text-right border border-gray-200 rounded px-2 py-1"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center">
+      );
+    }
+
+    return (
+      <div className="bg-gray-100 -m-6 p-6">
+        <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+          <div className="p-8">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8 pb-6 border-b">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
+                <p className="text-gray-600 mt-1">{isEditing ? offerId : 'Neu'}</p>
+              </div>
+              <div className="text-right text-sm text-gray-600">
+                <p className="font-medium text-gray-900">Ihr Unternehmen</p>
+                <p>Musterstraße 123</p>
+                <p>12345 Musterstadt</p>
+              </div>
+            </div>
+
+            {/* Kunde & Datum */}
+            <div className="grid grid-cols-2 gap-8 mb-8">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Empfänger</p>
+                <div className="text-sm">
+                  <p className="font-medium text-gray-900">
+                    {customer?.firmennameKundenname || customer?.name || '-'}
+                  </p>
+                  {customer?.strasse && <p>{customer.strasse}</p>}
+                  {(customer?.plz || customer?.ort) && (
+                    <p>{customer?.plz} {customer?.ort}</p>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Datum:</span>
+                    <span>{formatDateLocal(new Date())}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Gültig bis:</span>
+                    <span>{formatDateLocal(offerData.conditions?.validUntil)}</span>
+                  </div>
+                  {project && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Projekt:</span>
+                      <span>{project.projektname || project.name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Editierbare Positionstabelle */}
+            <div className="mb-8">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-gray-300">
+                    <th className="py-2 text-left font-medium text-gray-700 w-12">Pos.</th>
+                    <th className="py-2 text-left font-medium text-gray-700">Beschreibung</th>
+                    <th className="py-2 text-right font-medium text-gray-700 w-20">Menge</th>
+                    <th className="py-2 text-center font-medium text-gray-700 w-16">Einheit</th>
+                    <th className="py-2 text-right font-medium text-gray-700 w-24">EP (netto)</th>
+                    <th className="py-2 text-right font-medium text-gray-700 w-16">Rabatt</th>
+                    <th className="py-2 text-right font-medium text-gray-700 w-28">Gesamt</th>
+                    <th className="py-2 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {offerData.items.map((item, index) => (
+                    <tr key={item.id || index} className="border-b border-gray-100 group">
+                      <td className="py-3 text-gray-600">{item.position || index + 1}</td>
+                      <td className="py-3">
+                        <input
+                          type="text"
+                          value={item.shortText}
+                          onChange={(e) => handleUpdateItem(item.id, { shortText: e.target.value })}
+                          className="w-full bg-transparent border-0 p-0 focus:ring-0 font-medium text-gray-900"
+                        />
+                        {item.laborFactor > 1 && (
+                          <span className="text-xs text-amber-600 block">
+                            +{Math.round((item.laborFactor - 1) * 100)}% Arbeitszeit
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3">
                         <input
                           type="number"
                           min="0"
-                          max="100"
-                          value={item.discount}
-                          onChange={(e) => handleUpdateItem(item.id, { discount: parseFloat(e.target.value) || 0 })}
-                          className="w-full text-right border border-gray-200 rounded px-2 py-1"
+                          step="0.1"
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
+                          className="w-full text-right bg-transparent border-0 p-0 focus:ring-0"
                         />
-                        <span className="ml-1 text-gray-500">%</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium">
-                      {formatPrice(item.totalNet)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <button
-                        onClick={() => handleRemoveItem(item.id)}
-                        className="p-1 text-gray-400 hover:text-red-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                      <td className="py-3 text-center text-gray-600">{item.unit}</td>
+                      <td className="py-3">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unitPriceNet}
+                          onChange={(e) => handleUpdateItem(item.id, { unitPriceNet: parseFloat(e.target.value) || 0 })}
+                          className="w-full text-right bg-transparent border-0 p-0 focus:ring-0"
+                        />
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center justify-end">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={item.discount}
+                            onChange={(e) => handleUpdateItem(item.id, { discount: parseFloat(e.target.value) || 0 })}
+                            className="w-12 text-right bg-transparent border-0 p-0 focus:ring-0"
+                          />
+                          <span className="text-gray-400 ml-0.5">%</span>
+                        </div>
+                      </td>
+                      <td className="py-3 text-right font-medium">{formatPrice(item.totalNet)}</td>
+                      <td className="py-3">
+                        <button
+                          onClick={() => handleRemoveItem(item.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-          {/* Summen */}
-          <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Zwischensumme (netto):</span>
-              <span>{formatPrice(offerData.totals?.subtotalNet)}</span>
+              {/* Manuelle Position Button */}
+              <button
+                onClick={handleAddManualItem}
+                className="mt-4 w-full py-2 border-2 border-dashed border-gray-200 rounded text-gray-500 hover:border-blue-400 hover:text-blue-600 text-sm flex items-center justify-center transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Manuelle Position hinzufügen
+              </button>
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-600">Gesamtrabatt:</span>
-              <div className="flex items-center">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={offerData.totals?.discountPercent || 0}
-                  onChange={(e) => setOfferData(prev => ({
-                    ...prev,
-                    totals: { ...prev.totals, discountPercent: parseFloat(e.target.value) || 0 }
-                  }))}
-                  className="w-16 text-right border border-gray-300 rounded px-2 py-1 mr-1"
-                />
-                <span className="text-gray-500">%</span>
-                <span className="ml-4">- {formatPrice(offerData.totals?.discountAmount)}</span>
+
+            {/* Summen - wie Vorschau, aber editierbar */}
+            <div className="flex justify-end mb-8">
+              <div className="w-72">
+                {/* Mengenstaffel Info */}
+                {offerData.totals?.quantityScaleDiscount > 0 && (
+                  <div className="bg-green-50 text-green-700 rounded p-2 mb-3 text-xs">
+                    <div className="flex items-center">
+                      <TrendingDown className="h-3 w-3 mr-1" />
+                      Mengenstaffel: {offerData.totals.moduleCount} Module ({offerData.totals.quantityScaleTier?.label})
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span>-{offerData.totals.quantityScaleDiscount}% auf Arbeitszeit</span>
+                      <span>-{formatPrice(offerData.totals.laborReductionTotal)}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Zwischensumme (netto):</span>
+                    <span>{formatPrice(offerData.totals?.subtotalNet)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Rabatt:</span>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={offerData.totals?.discountPercent || 0}
+                        onChange={(e) => setOfferData(prev => ({
+                          ...prev,
+                          totals: { ...prev.totals, discountPercent: parseFloat(e.target.value) || 0 }
+                        }))}
+                        className="w-12 text-right border border-gray-200 rounded px-1 py-0.5 text-xs"
+                      />
+                      <span className="text-gray-400 ml-1">%</span>
+                      {offerData.totals?.discountAmount > 0 && (
+                        <span className="ml-2 text-red-600">-{formatPrice(offerData.totals?.discountAmount)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-gray-600">Netto:</span>
+                    <span>{formatPrice(offerData.totals?.netTotal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">MwSt:</span>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={offerData.totals?.taxRate ?? 0}
+                        onChange={(e) => setOfferData(prev => ({
+                          ...prev,
+                          totals: { ...prev.totals, taxRate: parseFloat(e.target.value) || 0 }
+                        }))}
+                        className="w-12 text-right border border-gray-200 rounded px-1 py-0.5 text-xs"
+                      />
+                      <span className="text-gray-400 ml-1">%</span>
+                      <span className="ml-2">{formatPrice(offerData.totals?.taxAmount)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between border-t-2 border-gray-900 pt-2 text-lg font-bold">
+                    <span>Gesamtbetrag:</span>
+                    <span>{formatPrice(offerData.totals?.grossTotal)}</span>
+                  </div>
+                  {/* Anzahlung */}
+                  <div className="flex justify-between items-center mt-3 pt-3 border-t border-dashed">
+                    <span className="text-gray-600">Anzahlung:</span>
+                    <div className="flex items-center">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={offerData.depositPercent ?? 50}
+                        onChange={(e) => setOfferData(prev => ({
+                          ...prev,
+                          depositPercent: parseFloat(e.target.value) || 0
+                        }))}
+                        className="w-12 text-right border border-gray-200 rounded px-1 py-0.5 text-xs"
+                      />
+                      <span className="text-gray-400 ml-1">%</span>
+                      <span className="ml-2 font-medium">{formatPrice((offerData.totals?.grossTotal || 0) * ((offerData.depositPercent ?? 50) / 100))}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex justify-between text-sm border-t pt-2">
-              <span className="text-gray-600">Netto:</span>
-              <span className="font-medium">{formatPrice(offerData.totals?.netTotal)}</span>
+
+            {/* Footer */}
+            <div className="border-t pt-6 text-sm text-gray-600 space-y-3">
+              {(offerData.depositPercent > 0) && (
+                <>
+                  <p>
+                    Die Endzahlung erfolgt mit einer Frist von sieben Tagen nach Abschluss aller Montagearbeiten.
+                  </p>
+                  <p>
+                    Wir würden uns sehr freuen, wenn unser Angebot Ihre Zustimmung findet. Sie haben Fragen oder wünschen
+                    weitere Informationen? Rufen Sie uns an – wir sind für Sie da.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Durch Anzahlung stimmen Sie den Widerrufsbedingungen zu.
+                  </p>
+                </>
+              )}
+              <p className="mt-4">Mit freundlichen Grüßen</p>
+              <p className="mt-2 font-medium text-gray-700">Ihr Unternehmen</p>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">MwSt ({offerData.totals?.taxRate}%):</span>
-              <span>{formatPrice(offerData.totals?.taxAmount)}</span>
-            </div>
-            <div className="flex justify-between text-lg font-bold border-t pt-2">
-              <span>Gesamtbetrag (brutto):</span>
-              <span className="text-blue-600">{formatPrice(offerData.totals?.grossTotal)}</span>
-            </div>
+
           </div>
-        </>
-      )}
-    </div>
-  );
-
-  // Step 2: Konditionen
-  const renderConditionsStep = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Gültig bis
-          </label>
-          <input
-            type="date"
-            value={offerData.conditions?.validUntil || ''}
-            onChange={(e) => setOfferData(prev => ({
-              ...prev,
-              conditions: { ...prev.conditions, validUntil: e.target.value }
-            }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Zahlungsbedingungen
-          </label>
-          <input
-            type="text"
-            value={offerData.conditions?.paymentTerms || ''}
-            onChange={(e) => setOfferData(prev => ({
-              ...prev,
-              conditions: { ...prev.conditions, paymentTerms: e.target.value }
-            }))}
-            placeholder="z.B. 14 Tage netto"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-          />
         </div>
       </div>
+    );
+  };
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Lieferbedingungen
-        </label>
-        <input
-          type="text"
-          value={offerData.conditions?.deliveryTerms || ''}
-          onChange={(e) => setOfferData(prev => ({
-            ...prev,
-            conditions: { ...prev.conditions, deliveryTerms: e.target.value }
-          }))}
-          placeholder="z.B. Nach Vereinbarung"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Anmerkungen / Notizen
-        </label>
-        <textarea
-          value={offerData.conditions?.notes || ''}
-          onChange={(e) => setOfferData(prev => ({
-            ...prev,
-            conditions: { ...prev.conditions, notes: e.target.value }
-          }))}
-          rows={5}
-          placeholder="Zusätzliche Informationen zum Angebot..."
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-    </div>
-  );
-
-  // Step 3: Abschluss (mit Kunde/Projekt-Auswahl)
-  const renderSummaryStep = () => {
+  // Step 0: Kunde/Projekt auswählen
+  const renderCustomerStep = () => {
     const customer = customers.find(c => c.id === selectedCustomer);
-    const project = projects.find(p => p.id === selectedProject);
 
     return (
       <div className="space-y-6">
-        {/* Kunde & Projekt Auswahl */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-medium text-gray-900 mb-4 flex items-center">
-            <Users className="h-5 w-5 mr-2 text-gray-500" />
-            Kunde & Projekt zuweisen
-          </h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Kunde <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedCustomer}
+              onChange={(e) => {
+                setSelectedCustomer(e.target.value);
+                setSelectedProject(''); // Reset project when customer changes
+                setValidationErrors(prev => ({ ...prev, customer: null }));
+              }}
+              className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 ${
+                validationErrors.customer ? 'border-red-300' : 'border-gray-300'
+              }`}
+            >
+              <option value="">Kunde auswählen...</option>
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.firmennameKundenname || c.name}
+                </option>
+              ))}
+            </select>
+            {validationErrors.customer && (
+              <p className="text-red-500 text-xs mt-1">{validationErrors.customer}</p>
+            )}
+          </div>
 
-          <div className="space-y-4">
+          {selectedCustomer && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kunde <span className="text-red-500">*</span>
+                Projekt (optional)
               </label>
               <select
-                value={selectedCustomer}
-                onChange={(e) => {
-                  setSelectedCustomer(e.target.value);
-                  setSelectedProject(''); // Reset project when customer changes
-                  setValidationErrors(prev => ({ ...prev, customer: null }));
-                }}
-                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 ${
-                  validationErrors.customer ? 'border-red-300' : 'border-gray-300'
-                }`}
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Kunde auswählen...</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.firmennameKundenname || c.name}
+                <option value="">Kein Projekt ausgewählt</option>
+                {customerProjects.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.projektname || p.name}
                   </option>
                 ))}
               </select>
-              {validationErrors.customer && (
-                <p className="text-red-500 text-xs mt-1">{validationErrors.customer}</p>
+            </div>
+          )}
+
+          {/* Kundeninfo-Preview */}
+          {customer && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+              <p className="text-sm text-blue-600 mb-1">Ausgewählter Kunde:</p>
+              <p className="font-medium text-blue-900">{customer.firmennameKundenname || customer.name}</p>
+              {customer.strasse && <p className="text-sm text-blue-700">{customer.strasse}</p>}
+              {customer.plz && customer.ort && (
+                <p className="text-sm text-blue-700">{customer.plz} {customer.ort}</p>
               )}
             </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-            {selectedCustomer && (
+  // Step 3: Vorschau (wie PDF-Ansicht)
+  const renderPreviewStep = () => {
+    const customer = customers.find(c => c.id === selectedCustomer);
+    const project = projects.find(p => p.id === selectedProject);
+
+    const formatDate = (dateString) => {
+      if (!dateString) return '-';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('de-DE');
+      } catch {
+        return dateString;
+      }
+    };
+
+    return (
+      <div className="bg-gray-100 -m-6 p-6">
+        <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+          {/* PDF Content - A4 Layout */}
+          <div className="p-8">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8 pb-6 border-b">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Projekt (optional)
-                </label>
-                <select
-                  value={selectedProject}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Kein Projekt ausgewählt</option>
-                  {customerProjects.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.projektname || p.name}
-                    </option>
+                <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
+                <p className="text-gray-600 mt-1">{isEditing ? offerId : 'Neu'}</p>
+              </div>
+              <div className="text-right text-sm text-gray-600">
+                <p className="font-medium text-gray-900">Ihr Unternehmen</p>
+                <p>Musterstraße 123</p>
+                <p>12345 Musterstadt</p>
+                <p>Tel: 0123 456789</p>
+                <p>info@unternehmen.de</p>
+              </div>
+            </div>
+
+            {/* Kunde & Datum */}
+            <div className="grid grid-cols-2 gap-8 mb-8">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Empfänger</p>
+                <div className="text-sm">
+                  <p className="font-medium text-gray-900">
+                    {customer?.firmennameKundenname || customer?.name || '-'}
+                  </p>
+                  {customer?.strasse && <p>{customer.strasse}</p>}
+                  {(customer?.plz || customer?.ort) && (
+                    <p>{customer?.plz} {customer?.ort}</p>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Datum:</span>
+                    <span>{formatDate(new Date())}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Gültig bis:</span>
+                    <span>{formatDate(offerData.conditions?.validUntil)}</span>
+                  </div>
+                  {project && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Projekt:</span>
+                      <span>{project.projektname || project.name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Betreff */}
+            <div className="mb-6">
+              <p className="font-medium text-gray-900">
+                Betreff: Angebot {project ? `- ${project.projektname || project.name}` : ''}
+              </p>
+            </div>
+
+            {/* Einleitung */}
+            <div className="mb-6 text-sm text-gray-600">
+              <p>
+                Vielen Dank für Ihre Anfrage. Wir freuen uns, Ihnen folgendes Angebot unterbreiten zu dürfen:
+              </p>
+            </div>
+
+            {/* Positionen */}
+            <div className="mb-8">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-gray-300">
+                    <th className="py-2 text-left font-medium text-gray-700 w-12">Pos.</th>
+                    <th className="py-2 text-left font-medium text-gray-700">Beschreibung</th>
+                    <th className="py-2 text-right font-medium text-gray-700 w-16">Menge</th>
+                    <th className="py-2 text-center font-medium text-gray-700 w-16">Einheit</th>
+                    <th className="py-2 text-right font-medium text-gray-700 w-24">EP (netto)</th>
+                    <th className="py-2 text-right font-medium text-gray-700 w-28">Gesamt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {offerData.items.map((item, index) => (
+                    <tr key={item.id || index} className="border-b border-gray-100">
+                      <td className="py-3 text-gray-600">{item.position || index + 1}</td>
+                      <td className="py-3">
+                        <p className="font-medium text-gray-900">{item.shortText}</p>
+                        {item.longText && (
+                          <p className="text-xs text-gray-500 mt-1">{item.longText}</p>
+                        )}
+                      </td>
+                      <td className="py-3 text-right">{item.quantity}</td>
+                      <td className="py-3 text-center text-gray-600">{item.unit}</td>
+                      <td className="py-3 text-right">{formatPrice(item.unitPriceNet)}</td>
+                      <td className="py-3 text-right font-medium">{formatPrice(item.totalNet)}</td>
+                    </tr>
                   ))}
-                </select>
-              </div>
-            )}
+                </tbody>
+              </table>
+            </div>
 
-            {/* Kundeninfo-Preview */}
-            {customer && (
-              <div className="bg-gray-50 rounded-lg p-4 mt-4">
-                <p className="text-sm text-gray-500 mb-1">Ausgewählter Kunde:</p>
-                <p className="font-medium">{customer.firmennameKundenname || customer.name}</p>
-                {customer.strasse && <p className="text-sm text-gray-600">{customer.strasse}</p>}
-                {customer.plz && customer.ort && (
-                  <p className="text-sm text-gray-600">{customer.plz} {customer.ort}</p>
-                )}
+            {/* Summen */}
+            <div className="flex justify-end mb-8">
+              <div className="w-64">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Zwischensumme (netto):</span>
+                    <span>{formatPrice(offerData.totals?.subtotalNet)}</span>
+                  </div>
+                  {offerData.totals?.discountPercent > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>Rabatt ({offerData.totals?.discountPercent}%):</span>
+                      <span>- {formatPrice(offerData.totals?.discountAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-gray-600">Netto:</span>
+                    <span>{formatPrice(offerData.totals?.netTotal)}</span>
+                  </div>
+                  {(offerData.totals?.taxRate > 0) && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">MwSt ({offerData.totals?.taxRate}%):</span>
+                      <span>{formatPrice(offerData.totals?.taxAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t-2 border-gray-900 pt-2 text-lg font-bold">
+                    <span>Gesamtbetrag:</span>
+                    <span>{formatPrice(offerData.totals?.grossTotal)}</span>
+                  </div>
+                  {/* Anzahlung */}
+                  {(offerData.depositPercent > 0) && (
+                    <>
+                      <div className="flex justify-between mt-3 pt-3 border-t border-dashed text-sm">
+                        <span className="text-gray-600">Anzahlung ({offerData.depositPercent}%):</span>
+                        <span className="font-medium">{formatPrice((offerData.totals?.grossTotal || 0) * (offerData.depositPercent / 100))}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Schlussrechnung ({100 - offerData.depositPercent}%):</span>
+                        <span className="font-medium">{formatPrice((offerData.totals?.grossTotal || 0) * ((100 - offerData.depositPercent) / 100))}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t pt-6 text-sm text-gray-600 space-y-3">
+              {(offerData.depositPercent > 0) && (
+                <>
+                  <p>
+                    Die Endzahlung erfolgt mit einer Frist von sieben Tagen nach Abschluss aller Montagearbeiten.
+                  </p>
+                  <p>
+                    Wir würden uns sehr freuen, wenn unser Angebot Ihre Zustimmung findet. Sie haben Fragen oder wünschen
+                    weitere Informationen? Rufen Sie uns an – wir sind für Sie da.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Durch Anzahlung stimmen Sie den Widerrufsbedingungen zu.
+                  </p>
+                </>
+              )}
+              <p className="mt-4">Mit freundlichen Grüßen</p>
+              <p className="mt-2 font-medium text-gray-700">Ihr Unternehmen</p>
+            </div>
           </div>
         </div>
-
-        {/* Zusammenfassung */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h3 className="font-medium text-gray-900 mb-4">Angebots-Zusammenfassung</h3>
-
-          <div className="border-t pt-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Anzahl Positionen:</span>
-              <span>{offerData.items.length}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Netto-Summe:</span>
-              <span>{formatPrice(offerData.totals?.netTotal)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">MwSt ({offerData.totals?.taxRate}%):</span>
-              <span>{formatPrice(offerData.totals?.taxAmount)}</span>
-            </div>
-            <div className="flex justify-between text-lg font-bold border-t pt-2">
-              <span>Gesamtbetrag:</span>
-              <span className="text-blue-600">{formatPrice(offerData.totals?.grossTotal)}</span>
-            </div>
-          </div>
-
-          <div className="border-t mt-4 pt-4 text-sm text-gray-600">
-            <p>Gültig bis: {offerData.conditions?.validUntil || '-'}</p>
-            <p>Zahlungsbedingungen: {offerData.conditions?.paymentTerms || '-'}</p>
-          </div>
-        </div>
-
       </div>
     );
   };
@@ -891,13 +1388,13 @@ const OfferConfigurator = () => {
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
-        return renderServicesStep();
+        return renderCustomerStep();
       case 1:
-        return renderPositionsStep();
+        return renderServicesStep();
       case 2:
-        return renderConditionsStep();
+        return renderPositionsStep();
       case 3:
-        return renderSummaryStep();
+        return renderPreviewStep();
       default:
         return null;
     }

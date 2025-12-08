@@ -10,6 +10,7 @@ import { BookingProvider } from './context/BookingContext';
 import { CalculationProvider } from './context/CalculationContext';
 import { ServiceCatalogProvider } from './context/ServiceCatalogContext';
 import { OfferProvider } from './context/OfferContext';
+import { InvoiceProvider } from './context/InvoiceContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
 import MaterialManagement from './components/MaterialManagement';
@@ -22,6 +23,8 @@ import VDEProtocols from './components/VDEProtocols';
 import PVConfigurator from './components/PVConfigurator';
 import OfferManagement from './components/offers/OfferManagement';
 import OfferConfigurator from './components/offers/OfferConfigurator';
+import InvoiceManagement from './components/invoices/InvoiceManagement';
+import InvoiceConfigurator from './components/invoices/InvoiceConfigurator';
 import Settings from './components/Settings';
 import UserAvatar from './components/UserAvatar';
 import Sidebar from './components/Sidebar';
@@ -40,6 +43,7 @@ function App() {
                 <CalculationProvider>
                 <ServiceCatalogProvider>
                 <OfferProvider>
+                <InvoiceProvider>
                 <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                   <div className="min-h-dvh bg-gray-50">
                     <Routes>
@@ -63,6 +67,9 @@ function App() {
                                   <Route path="/offers" element={<div className="p-6 h-full"><OfferManagement /></div>} />
                                   <Route path="/offers/new" element={<OfferConfigurator />} />
                                   <Route path="/offers/:id" element={<OfferConfigurator />} />
+                                  <Route path="/invoices" element={<div className="p-6 h-full"><InvoiceManagement /></div>} />
+                                  <Route path="/invoices/new" element={<InvoiceConfigurator />} />
+                                  <Route path="/invoices/:id" element={<InvoiceConfigurator />} />
                                   <Route path="/settings" element={<div className="p-6 h-full"><Settings /></div>} />
                                   <Route path="/" element={<Navigate to="/materials" replace />} />
                                 </Routes>
@@ -74,6 +81,7 @@ function App() {
                     </Routes>
                   </div>
                 </Router>
+                </InvoiceProvider>
                 </OfferProvider>
                 </ServiceCatalogProvider>
                 </CalculationProvider>

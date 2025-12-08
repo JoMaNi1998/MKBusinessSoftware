@@ -51,6 +51,7 @@ const ProjectManagement = () => {
   });
   const [activeColumnFilter, setActiveColumnFilter] = useState(null);
   const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const [editingStatus, setEditingStatus] = useState(null);
 
   const availableColumns = [
     { key: 'name', label: 'Projekt', required: true },
@@ -243,6 +244,26 @@ const ProjectManagement = () => {
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
     setEditingProject(null);
+  };
+
+  // Inline Status Editing Functions
+  const handleStatusEdit = (projectId) => {
+    setEditingStatus(projectId);
+  };
+
+  const handleStatusSave = async (projectId, newStatus) => {
+    try {
+      await updateProject(projectId, { status: newStatus });
+      showNotification('Status erfolgreich aktualisiert', 'success');
+      setEditingStatus(null);
+    } catch (error) {
+      console.error('Fehler beim Speichern des Status:', error);
+      showNotification('Fehler beim Aktualisieren des Status', 'error');
+    }
+  };
+
+  const handleStatusCancel = () => {
+    setEditingStatus(null);
   };
 
   const formatDate = (dateString) => {
@@ -523,10 +544,28 @@ const ProjectManagement = () => {
                       </td>
                     )}
                     {visibleColumns.status && (
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
-                          {project.status}
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        {editingStatus === project.id ? (
+                          <select
+                            value={project.status}
+                            onChange={(e) => handleStatusSave(project.id, e.target.value)}
+                            onBlur={handleStatusCancel}
+                            className="px-2 py-1 text-xs font-medium border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            autoFocus
+                          >
+                            {statusOptions.filter(opt => opt.value !== 'alle').map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer hover:ring-2 hover:ring-primary-300 ${getStatusColor(project.status)}`}
+                            onClick={() => handleStatusEdit(project.id)}
+                            title="Klicken zum Bearbeiten"
+                          >
+                            {project.status}
+                          </span>
+                        )}
                       </td>
                     )}
                     {visibleColumns.address && (
