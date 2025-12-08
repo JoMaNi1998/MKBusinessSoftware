@@ -14,12 +14,33 @@ import {
 import { useBookings } from '../context/BookingContext';
 import { useNotification } from '../context/NotificationContext';
 
+const ITEMS_PER_PAGE = 20;
+
+// Hilfsfunktion um Timestamp zu Date zu konvertieren (Firebase Timestamp Support)
+const parseTimestamp = (timestamp) => {
+  if (!timestamp) return null;
+
+  if (timestamp instanceof Date) {
+    return timestamp;
+  } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+    return new Date(timestamp);
+  } else if (timestamp.seconds) {
+    // Firebase Timestamp
+    return new Date(timestamp.seconds * 1000);
+  } else if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+    // Firebase Timestamp mit toDate() Methode
+    return timestamp.toDate();
+  }
+  return null;
+};
+
 const BookingHistory = () => {
   const { bookings, undoBooking, getBookingStatistics } = useBookings();
   const { showNotification } = useNotification();
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState('alle');
+  const [dateFilter, setDateFilter] = useState('monat'); // Standard: Letzter Monat statt alle
   const [typeFilter, setTypeFilter] = useState('alle');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const bookingHistory = bookings;
   const stats = getBookingStatistics();
@@ -37,31 +58,45 @@ const BookingHistory = () => {
     
     let matchesDate = true;
     if (dateFilter !== 'alle') {
-      const entryDate = new Date(entry.timestamp);
+      const entryDate = parseTimestamp(entry.timestamp);
       const today = new Date();
-      
-      switch (dateFilter) {
-        case 'heute':
-          matchesDate = entryDate.toDateString() === today.toDateString();
-          break;
-        case 'woche': {
-          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-          matchesDate = entryDate >= weekAgo;
-          break;
+
+      if (!entryDate || isNaN(entryDate.getTime())) {
+        matchesDate = false; // Ungültiges Datum ausfiltern
+      } else {
+        switch (dateFilter) {
+          case 'heute':
+            matchesDate = entryDate.toDateString() === today.toDateString();
+            break;
+          case 'woche': {
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            matchesDate = entryDate >= weekAgo;
+            break;
+          }
+          case 'monat': {
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            matchesDate = entryDate >= monthAgo;
+            break;
+          }
+          default:
+            matchesDate = true; // Alle anzeigen wenn kein Filter
+            break;
         }
-        case 'monat': {
-          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-          matchesDate = entryDate >= monthAgo;
-          break;
-        }
-        default:
-          matchesDate = true; // Alle anzeigen wenn kein Filter
-          break;
       }
     }
     
     return matchesSearch && matchesType && matchesDate;
   });
+
+  // Pagination berechnen
+  const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedHistory = filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Seite zurücksetzen wenn Filter sich ändern
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, dateFilter, typeFilter]);
 
   const formatDateTime = (timestamp) => {
     if (!timestamp) return 'Unbekannt';
@@ -115,6 +150,13 @@ const BookingHistory = () => {
   };
 
   const handleUndoBooking = (bookingId) => {
+    // Prüfen ob Buchung noch existiert (Idempotenz)
+    const bookingExists = bookings.some(b => b.id === bookingId);
+    if (!bookingExists) {
+      showNotification('Buchung existiert nicht mehr', 'warning');
+      return;
+    }
+
     if (window.confirm('Buchung wirklich rückgängig machen?')) {
       undoBooking(bookingId);
       showNotification('Buchung erfolgreich rückgängig gemacht', 'success');
@@ -227,7 +269,7 @@ const BookingHistory = () => {
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-auto">
               <div className="space-y-4 p-6">
-                {filteredHistory.map((entry) => (
+                {paginatedHistory.map((entry) => (
                   <div key={entry.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -299,7 +341,7 @@ const BookingHistory = () => {
                   </div>
                 ))}
 
-              {filteredHistory.length === 0 && (
+              {paginatedHistory.length === 0 && (
                 <div className="text-center py-12">
                   <History className="mx-auto h-12 w-12 text-gray-400" />
                   <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Buchungen gefunden</h3>
@@ -314,6 +356,34 @@ const BookingHistory = () => {
             </div>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+            <div className="text-sm text-gray-700">
+              Zeige {startIndex + 1} - {Math.min(startIndex + ITEMS_PER_PAGE, filteredHistory.length)} von {filteredHistory.length} Buchungen
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Zurück
+              </button>
+              <span className="text-sm text-gray-700">
+                Seite {currentPage} von {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Weiter
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

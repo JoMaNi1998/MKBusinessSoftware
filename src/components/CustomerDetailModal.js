@@ -114,6 +114,26 @@ const computeNextCustomerId = (customers = []) => {
   return `KUN-${String(max + 1).padStart(3, '0')}`;
 };
 
+const computeNextProjectId = (projects = []) => {
+  const regex = /^PRO-(\d{3,})$/;
+  const max = projects.reduce((acc, p) => {
+    const id = p?.projectID;
+    if (!id || typeof id !== 'string') return acc;
+    const m = id.match(regex);
+    if (!m) return acc;
+    const n = parseInt(m[1], 10);
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  return `PRO-${String(max + 1).padStart(3, '0')}`;
+};
+
+const random4 = () => String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+
+const sanitizeCustomerName = (name) => {
+  if (!name) return '';
+  return name.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '').substring(0, 20);
+};
+
 const addressFromParts = ({ street, houseNumber, postalCode, city }) => {
   const s = (street || '').trim();
   const h = (houseNumber || '').trim();
@@ -291,7 +311,7 @@ const CustomerModal = ({
   const isEdit = mode === 'edit';
   const isCreate = mode === 'create';
 
-  const { getProjectsByCustomer } = useProjects();
+  const { getProjectsByCustomer, projects, addProject } = useProjects();
   const { customers, addCustomer, updateCustomer } = useCustomers();
   const { showNotification } = useNotification();
   const { bookings = [] } = useBookings();
@@ -515,8 +535,32 @@ const CustomerModal = ({
         });
         showNotification('Kunde erfolgreich aktualisiert', 'success');
       } else if (isCreate) {
-        await addCustomer({ ...payload, createdAt: new Date().toISOString() });
+        const newCustomerId = await addCustomer({ ...payload, createdAt: new Date().toISOString() });
         showNotification('Kunde erfolgreich hinzugefügt', 'success');
+
+        // Automatisch Projekt erstellen
+        try {
+          const projectID = computeNextProjectId(projects);
+          const projectName = `${sanitizeCustomerName(payload.firmennameKundenname)}${random4()}`;
+
+          await addProject({
+            projectID,
+            name: projectName,
+            customerID: newCustomerId || customerID,
+            customerName: payload.firmennameKundenname,
+            address: payload.address,
+            street: payload.street,
+            houseNumber: payload.houseNumber,
+            postalCode: payload.postalCode,
+            city: payload.city,
+            status: 'Geplant',
+            description: '',
+            notes: ''
+          });
+          showNotification(`Projekt "${projectName}" automatisch erstellt`, 'info');
+        } catch (projErr) {
+          console.error('Fehler beim automatischen Erstellen des Projekts:', projErr);
+        }
       }
       onClose?.();
     } catch (err) {
@@ -549,7 +593,7 @@ const CustomerModal = ({
 
   // Kosten laden wenn sich Projekte oder Buchungen ändern
   useEffect(() => {
-    if (isView && customerProjects.length >= 0) {
+    if (isView && customerProjects.length > 0) {
       loadCustomerCosts();
     }
   }, [isView, customerProjects, bookings, loadCustomerCosts]);

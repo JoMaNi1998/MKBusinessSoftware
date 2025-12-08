@@ -128,13 +128,18 @@ export class FirebaseService {
   static subscribeToCollection(collectionName, callback, orderByField = 'createdAt') {
     try {
       const q = query(collection(db, collectionName), orderBy(orderByField, 'desc'));
-      return onSnapshot(q, (querySnapshot) => {
-        const documents = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        callback(documents);
-      });
+      return onSnapshot(q,
+        (querySnapshot) => {
+          const documents = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          callback(documents);
+        },
+        (error) => {
+          console.error(`Error in real-time listener for ${collectionName}:`, error);
+        }
+      );
     } catch (error) {
       console.error(`Error subscribing to ${collectionName}:`, error);
       throw error;
@@ -273,15 +278,15 @@ export class ProjectService {
   static async addProject(projectData) {
     return FirebaseService.addDocument(COLLECTIONS.PROJECTS, {
       ...projectData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     });
   }
 
   static async updateProject(projectId, projectData) {
     return FirebaseService.updateDocument(COLLECTIONS.PROJECTS, projectId, {
       ...projectData,
-      updatedAt: new Date().toISOString()
+      updatedAt: serverTimestamp()
     });
   }
 
@@ -335,13 +340,19 @@ export class CalculationSettingsService {
 
   static subscribeToSettings(callback) {
     const docRef = doc(db, COLLECTIONS.CALCULATION_SETTINGS, 'default');
-    return onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        callback({ id: docSnap.id, ...docSnap.data() });
-      } else {
+    return onSnapshot(docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          callback({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          callback(null);
+        }
+      },
+      (error) => {
+        console.error('Error in settings listener:', error);
         callback(null);
       }
-    });
+    );
   }
 }
 

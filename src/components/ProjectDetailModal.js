@@ -22,6 +22,7 @@ import {
 import BaseModal from './BaseModal';
 import { useBookings } from '../context/BookingContext';
 import { useCustomers } from '../context/CustomerContext';
+import { useNotification } from '../context/NotificationContext';
 import { FirebaseService } from '../services/firebaseService';
 import VDEProtocolModal from './VDEProtocolModal';
 
@@ -199,6 +200,7 @@ const ProjectModal = ({
   // Contexts wie bisher im Detail-Modal
   const { bookings = [] } = useBookings();
   const { customers: customersCtx = [] } = useCustomers();
+  const { showNotification } = useNotification();
 
   // Für create/edit nehmen wir bevorzugt die per Prop übergebenen Kunden/Projekte
   const customersList = (isCreate || isEdit) && customersProp.length ? customersProp : customersCtx;
@@ -725,7 +727,7 @@ const ProjectModal = ({
                                     setProjectConfigurations((prev) => prev.filter((c) => c.id !== configId));
                                   } catch (e) {
                                     console.error('Fehler beim Löschen:', e);
-                                    alert('Fehler beim Löschen der Konfiguration!');
+                                    showNotification('Fehler beim Löschen der Konfiguration!', 'error');
                                   } finally {
                                     setDeletingConfigId(null);
                                   }

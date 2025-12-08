@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback } from 'react';
 import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
 
 const NotificationContext = createContext();
@@ -13,8 +13,18 @@ export const useNotification = () => {
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
+  const timeoutRefs = useRef(new Map()); // Speichert Timeout-IDs pro Notification
 
-  const showNotification = (message, type = 'success', duration = 3000) => {
+  const removeNotification = useCallback((id) => {
+    // Timeout löschen falls vorhanden
+    if (timeoutRefs.current.has(id)) {
+      clearTimeout(timeoutRefs.current.get(id));
+      timeoutRefs.current.delete(id);
+    }
+    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  }, []);
+
+  const showNotification = useCallback((message, type = 'success', duration = 3000) => {
     const id = Date.now();
     const notification = {
       id,
@@ -26,21 +36,21 @@ export const NotificationProvider = ({ children }) => {
     setNotifications(prev => [...prev, notification]);
 
     if (duration > 0) {
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         removeNotification(id);
       }, duration);
+      timeoutRefs.current.set(id, timeoutId);
     }
 
     return id;
-  };
+  }, [removeNotification]);
 
-  const removeNotification = (id) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
-  };
-
-  const clearAllNotifications = () => {
+  const clearAllNotifications = useCallback(() => {
+    // Alle Timeouts löschen
+    timeoutRefs.current.forEach((timeoutId) => clearTimeout(timeoutId));
+    timeoutRefs.current.clear();
     setNotifications([]);
-  };
+  }, []);
 
   const getIcon = (type) => {
     switch (type) {

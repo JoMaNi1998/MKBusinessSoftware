@@ -28,6 +28,7 @@ import { useMaterials } from '../context/MaterialContext';
 import { useCustomers } from '../context/CustomerContext';
 import { useProjects } from '../context/ProjectContext';
 import { useBookings } from '../context/BookingContext';
+import { useNotification } from '../context/NotificationContext';
 import { FirebaseService } from '../services/firebaseService';
 import BaseModal from './BaseModal';
 
@@ -192,6 +193,7 @@ const PVConfigurator = () => {
   const { customers } = useCustomers();
   const { projects } = useProjects();
   const { addBooking } = useBookings();
+  const { showNotification } = useNotification();
 
   /* ---------------- State: Wizard ---------------- */
   const [currentStep, setCurrentStep] = useState(0);
@@ -199,6 +201,7 @@ const PVConfigurator = () => {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [customerProjects, setCustomerProjects] = useState([]);
+  const [isBooking, setIsBooking] = useState(false);
 
   /* ---------------- State: Konfiguration (ohne doppelte Felder) ---------------- */
   const [configuration, setConfiguration] = useState({
@@ -252,6 +255,9 @@ const PVConfigurator = () => {
     spannungsversorgungAPZ: '',
     spannungsversorgungAPZQty: 0,
 
+    // Smart Dongle
+    smartDongle: '',
+    smartDongleQty: 0,
   });
 
   /* ---------------- State: Defaults / Settings aus Firebase (bestehend) ---------------- */
@@ -831,27 +837,30 @@ const PVConfigurator = () => {
         });
 
         if (profileQty > 0) {
-          bom.push({ 
-            materialID: configuration.profile, 
-            quantity: profileQty, 
-            description: materialsById.get(configuration.profile)?.description || 'Profile', 
-            category: 'Profile' 
+          bom.push({
+            materialID: configuration.profile,
+            quantity: profileQty,
+            description: materialsById.get(configuration.profile)?.description || 'Profile',
+            category: 'Profile',
+            isConfigured: true,
           });
         }
         if (configuration.verbinder && verbinderQty > 0) {
-          bom.push({ 
-            materialID: configuration.verbinder, 
-            quantity: verbinderQty, 
-            description: materialsById.get(configuration.verbinder)?.description || 'Verbinder', 
-            category: 'Verbinder' 
+          bom.push({
+            materialID: configuration.verbinder,
+            quantity: verbinderQty,
+            description: materialsById.get(configuration.verbinder)?.description || 'Verbinder',
+            category: 'Verbinder',
+            isConfigured: true,
           });
         }
         if (configuration.endkappen && endClampQty > 0) {
-          bom.push({ 
-            materialID: configuration.endkappen, 
-            quantity: endClampQty, 
-            description: materialsById.get(configuration.endkappen)?.description || 'Endkappen', 
-            category: 'Endkappen' 
+          bom.push({
+            materialID: configuration.endkappen,
+            quantity: endClampQty,
+            description: materialsById.get(configuration.endkappen)?.description || 'Endkappen',
+            category: 'Endkappen',
+            isConfigured: true,
           });
         }
       }
@@ -860,11 +869,12 @@ const PVConfigurator = () => {
     // 4. PV-Stecker je String
     const totalStrings = configuration.inverters.reduce((t, inv) => t + ((inv.strings || []).length), 0);
     if (configuration.pvSteckerMale && totalStrings > 0) {
-      bom.push({ 
-        materialID: configuration.pvSteckerMale, 
-        quantity: totalStrings, 
-        description: materialsById.get(configuration.pvSteckerMale)?.description || 'PV-Stecker (Male)', 
-        category: 'PV-Stecker' 
+      bom.push({
+        materialID: configuration.pvSteckerMale,
+        quantity: totalStrings,
+        description: materialsById.get(configuration.pvSteckerMale)?.description || 'PV-Stecker (Male)',
+        category: 'PV-Stecker',
+        isConfigured: true,
       });
     }
     if (configuration.pvSteckerFemale && totalStrings > 0) {
@@ -873,6 +883,7 @@ const PVConfigurator = () => {
         quantity: totalStrings,
         description: materialsById.get(configuration.pvSteckerFemale)?.description || 'PV-Stecker (Female)',
         category: 'PV-Stecker',
+        isConfigured: true,
       });
     }
     // PV-Kabel (DC) flatrate: pro String * pvKabel * 2 (Plus/Minus)
@@ -885,26 +896,26 @@ const PVConfigurator = () => {
       });
     }
 
-    // 5. Optionale Komponenten
-    const addIf = (id, qty, desc, cat) => {
+    // 5. Optionale Komponenten (manuell konfiguriert)
+    const addIfConfigured = (id, qty, desc, cat) => {
       if (id && qty > 0) {
         const materialDesc = materialsById.get(id)?.description || desc;
-        bom.push({ materialID: id, quantity: qty, description: materialDesc, category: cat });
+        bom.push({ materialID: id, quantity: qty, description: materialDesc, category: cat, isConfigured: true });
       }
     };
-    addIf(configuration.optimizer, configuration.optimizerQty, 'Leistungsoptimierer', 'Optimierer');
-    addIf(configuration.battery, configuration.batteryQty, 'Batteriespeicher', 'Speicher');
-    addIf(configuration.wallbox, configuration.wallboxQty, 'Wallbox', 'Wallbox');
-    addIf(configuration.energiemanagement, configuration.energiemanagementQty, 'Energiemanagement', 'Energiemanagement');
-    addIf(configuration.smartDongle, configuration.smartDongleQty, 'Smart Dongle-WLAN-FE', 'Smart Dongle');
-    
-    // 6. Elektrische Komponenten
-    addIf(configuration.sls, configuration.slsQty, 'SLS', 'Elektrische Komponenten');
-    addIf(configuration.tiefenerder, configuration.tiefenerderQty, 'Tiefenerder', 'Elektrische Komponenten');
-    addIf(configuration.kombiableiter, configuration.kombiableiterQty, 'Kombiableiter', 'Elektrische Komponenten');
-    addIf(configuration.zaehlerschrank, configuration.zaehlerschrankQty, 'Zählerschrank', 'Elektrische Komponenten');
-    addIf(configuration.generatoranschlusskasten, configuration.generatoranschlusskastenQty, 'Generatoranschlusskasten', 'Elektrische Komponenten');
-    addIf(configuration.spannungsversorgungAPZ, configuration.spannungsversorgungAPZQty, 'Spannungsversorgung APZ', 'Elektrische Komponenten');
+    addIfConfigured(configuration.optimizer, configuration.optimizerQty, 'Leistungsoptimierer', 'Optimierer');
+    addIfConfigured(configuration.battery, configuration.batteryQty, 'Batteriespeicher', 'Speicher');
+    addIfConfigured(configuration.wallbox, configuration.wallboxQty, 'Wallbox', 'Wallbox');
+    addIfConfigured(configuration.energiemanagement, configuration.energiemanagementQty, 'Energiemanagement', 'Energiemanagement');
+    addIfConfigured(configuration.smartDongle, configuration.smartDongleQty, 'Smart Dongle-WLAN-FE', 'Smart Dongle');
+
+    // 6. Elektrische Komponenten (manuell konfiguriert)
+    addIfConfigured(configuration.sls, configuration.slsQty, 'SLS', 'Elektrische Komponenten');
+    addIfConfigured(configuration.tiefenerder, configuration.tiefenerderQty, 'Tiefenerder', 'Elektrische Komponenten');
+    addIfConfigured(configuration.kombiableiter, configuration.kombiableiterQty, 'Kombiableiter', 'Elektrische Komponenten');
+    addIfConfigured(configuration.zaehlerschrank, configuration.zaehlerschrankQty, 'Zählerschrank', 'Elektrische Komponenten');
+    addIfConfigured(configuration.generatoranschlusskasten, configuration.generatoranschlusskastenQty, 'Generatoranschlusskasten', 'Elektrische Komponenten');
+    addIfConfigured(configuration.spannungsversorgungAPZ, configuration.spannungsversorgungAPZQty, 'Spannungsversorgung APZ', 'Elektrische Komponenten');
     
     // Prüfung ob Energiemanagement Smart Dongle ersetzt
     let energiemanagementErsetzt = false;
@@ -937,13 +948,14 @@ const PVConfigurator = () => {
     if (autoSmartDongleCount > 0 && !configuration.smartDongle) {
       const smartDongleMaterials = materials.filter(m => m.categoryId === CAT.SMART_DONGLE);
       const defaultSmartDongle = smartDongleMaterials.find(m => m.description?.includes('Smart Dongle-WLAN-FE')) || smartDongleMaterials[0];
-      
+
       if (defaultSmartDongle) {
         bom.push({
           materialID: defaultSmartDongle.id,
           quantity: autoSmartDongleCount,
           description: materialsById.get(defaultSmartDongle.id)?.description || `Smart Dongle-WLAN-FE (automatisch für ${autoSmartDongleCount} WR)`,
           category: 'Smart Dongle',
+          isConfigured: true,
         });
       }
     }
@@ -969,9 +981,9 @@ const PVConfigurator = () => {
       });
     }
     
-    addIf(configuration.notstromloesungen, configuration.notstromloesungenQty, 'Notstromlösungen', 'Notstromlösungen');
+    addIfConfigured(configuration.notstromloesungen, configuration.notstromloesungenQty, 'Notstromlösungen', 'Notstromlösungen');
 
-    // 7. Empfohlene Komponenten (Schutzschalter/Kabel)
+    // 7. Empfohlene Komponenten (Schutzschalter/Kabel) - als konfiguriert markieren
     const inverterCount = configuration.inverters
       .filter((inv) => inv.type && inv.quantity > 0)
       .reduce((t, inv) => t + (parseInt(inv.quantity) || 1), 0);
@@ -982,6 +994,7 @@ const PVConfigurator = () => {
         quantity: inverterCount,
         description: materialsById.get(chosen.inverterBreaker)?.description || 'Leitungsschutzschalter (Wechselrichter)',
         category: 'Schutzschalter',
+        isConfigured: true,
       });
     }
     if (chosen.inverterCable && inverterCount > 0) {
@@ -990,6 +1003,7 @@ const PVConfigurator = () => {
         quantity: inverterCount * defaultCableLength,
         description: materialsById.get(chosen.inverterCable)?.description || `Mantelleitung (Wechselrichter) - ${defaultCableLength}m pro WR`,
         category: 'Kabel',
+        isConfigured: true,
       });
     }
     if (chosen.wallboxBreaker && configuration.wallboxQty > 0) {
@@ -998,6 +1012,7 @@ const PVConfigurator = () => {
         quantity: configuration.wallboxQty,
         description: materialsById.get(chosen.wallboxBreaker)?.description || 'Leitungsschutzschalter (Wallbox)',
         category: 'Schutzschalter',
+        isConfigured: true,
       });
     }
     if (chosen.wallboxCable && configuration.wallboxQty > 0) {
@@ -1006,6 +1021,7 @@ const PVConfigurator = () => {
         quantity: configuration.wallboxQty * defaultCableLength,
         description: materialsById.get(chosen.wallboxCable)?.description || `Mantelleitung (Wallbox) - ${defaultCableLength}m pro Wallbox`,
         category: 'Kabel',
+        isConfigured: true,
       });
     }
     if (chosen.wallboxRCD && configuration.wallboxQty > 0) {
@@ -1014,6 +1030,7 @@ const PVConfigurator = () => {
         quantity: configuration.wallboxQty,
         description: materialsById.get(chosen.wallboxRCD)?.description || 'FI-Schutzschalter (Wallbox)',
         category: 'Schutzschalter',
+        isConfigured: true,
       });
     }
     if (chosen.backupBreaker && configuration.notstromloesungenQty > 0) {
@@ -1022,6 +1039,7 @@ const PVConfigurator = () => {
         quantity: configuration.notstromloesungenQty,
         description: materialsById.get(chosen.backupBreaker)?.description || 'Leitungsschutzschalter (Notstrom)',
         category: 'Schutzschalter',
+        isConfigured: true,
       });
     }
     if (chosen.backupCable && configuration.notstromloesungenQty > 0) {
@@ -1030,6 +1048,7 @@ const PVConfigurator = () => {
         quantity: configuration.notstromloesungenQty * defaultCableLength,
         description: materialsById.get(chosen.backupCable)?.description || `Mantelleitung (Notstrom) - ${defaultCableLength}m pro Gerät`,
         category: 'Kabel',
+        isConfigured: true,
       });
     }
 
@@ -1229,29 +1248,32 @@ const PVConfigurator = () => {
     pushLen(defaultRohrschelleOutdoor, rohrschelleOutdoor, 'Rohrschelle Outdoor (Stück)');
     pushLen(defaultMuffeOutdoor, muffeOutdoor, 'Muffe Outdoor (Stück)');
 
-    // Aufkleber (Priorität: Notstrom > Speicher > PV)
+    // Aufkleber (Priorität: Notstrom > Speicher > PV) - als konfiguriert markieren
     const hasSpeicher = configuration.battery && configuration.batteryQty > 0;
     const hasNotstrom = configuration.notstromloesungen && configuration.notstromloesungenQty > 0;
     if (hasNotstrom && defaultAufkleberPVMitNotstrom) {
-      bom.push({ 
-        materialID: defaultAufkleberPVMitNotstrom, 
-        quantity: 1, 
-        description: materialsById.get(defaultAufkleberPVMitNotstrom)?.description || 'Aufkleber PV mit Notstrom', 
-        category: 'Aufkleber' 
+      bom.push({
+        materialID: defaultAufkleberPVMitNotstrom,
+        quantity: 1,
+        description: materialsById.get(defaultAufkleberPVMitNotstrom)?.description || 'Aufkleber PV mit Notstrom',
+        category: 'Aufkleber',
+        isConfigured: true,
       });
     } else if (hasSpeicher && defaultAufkleberPVMitSpeicher) {
-      bom.push({ 
-        materialID: defaultAufkleberPVMitSpeicher, 
-        quantity: 1, 
-        description: materialsById.get(defaultAufkleberPVMitSpeicher)?.description || 'Aufkleber PV mit Speicher', 
-        category: 'Aufkleber' 
+      bom.push({
+        materialID: defaultAufkleberPVMitSpeicher,
+        quantity: 1,
+        description: materialsById.get(defaultAufkleberPVMitSpeicher)?.description || 'Aufkleber PV mit Speicher',
+        category: 'Aufkleber',
+        isConfigured: true,
       });
     } else if (defaultAufkleberPV) {
-      bom.push({ 
-        materialID: defaultAufkleberPV, 
-        quantity: 1, 
-        description: materialsById.get(defaultAufkleberPV)?.description || 'Aufkleber PV', 
-        category: 'Aufkleber' 
+      bom.push({
+        materialID: defaultAufkleberPV,
+        quantity: 1,
+        description: materialsById.get(defaultAufkleberPV)?.description || 'Aufkleber PV',
+        category: 'Aufkleber',
+        isConfigured: true,
       });
     }
 
@@ -1551,9 +1573,12 @@ const PVConfigurator = () => {
   /* ---------------- Booking ---------------- */
   const handleBookToCustomer = async () => {
     if (!selectedCustomer || !selectedProject || calculatedBOM.length === 0) {
-      alert('Bitte Kunde und Projekt auswählen und Konfiguration vervollständigen!');
+      showNotification('Bitte Kunde und Projekt auswählen und Konfiguration vervollständigen!', 'warning');
       return;
     }
+    if (isBooking) return; // Doppelklick verhindern
+
+    setIsBooking(true);
     try {
       // Bestehende Konfigurationen für dieses Projekt laden
       const existingConfigs = await FirebaseService.getDocuments('project-configurations');
@@ -1585,13 +1610,15 @@ const PVConfigurator = () => {
           const material = materials.find(m => m.materialID === i.materialID || m.id === i.materialID);
           const priceAtBooking = material?.price || 0;
           const totalCost = priceAtBooking * i.quantity;
-          
+
           return {
             materialID: i.materialID,
             quantity: i.quantity,
             description: i.description,
             priceAtBooking: priceAtBooking,
-            totalCost: totalCost
+            totalCost: totalCost,
+            isConfigured: i.isConfigured || false,
+            category: i.category || ''
           };
         }),
         status: 'Abgeschlossen',
@@ -1690,7 +1717,7 @@ const PVConfigurator = () => {
         type: 'pv-configuration',
       });
 
-      alert('Stückliste und Projektkonfiguration erfolgreich gespeichert!');
+      showNotification('Stückliste und Projektkonfiguration erfolgreich gespeichert!', 'success', 5000);
       // Reset (schlank gehalten)
       setConfiguration({
         module: '',
@@ -1729,6 +1756,8 @@ const PVConfigurator = () => {
         generatoranschlusskastenQty: 0,
         spannungsversorgungAPZ: '',
         spannungsversorgungAPZQty: 0,
+        smartDongle: '',
+        smartDongleQty: 0,
       });
       setCurrentStep(0);
       setSelectedCustomer('');
@@ -1736,7 +1765,9 @@ const PVConfigurator = () => {
       setWarnings([]);
     } catch (e) {
       console.error('Fehler beim Buchen:', e);
-      alert('Fehler beim Buchen der Stückliste!');
+      showNotification('Fehler beim Buchen der Stückliste!', 'error');
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -2685,66 +2716,99 @@ const PVConfigurator = () => {
                         </button>
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Material
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Anzahl
-                            </th>
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
-                              Aktion
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {calculatedBOM.map((item, index) => (
-                            <tr key={`${item.materialID}-${index}`}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                <div className="flex items-center space-x-2">
-                                  <span>{materialsById.get(item.materialID)?.description || item.description}</span>
-                                  {item.isManual && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                      manuell hinzugefügt
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => {
-                                    const newQty = Math.max(1, parseInt(e.target.value) || 1);
-                                    setCalculatedBOM((prev) => {
-                                      const next = [...prev];
-                                      next[index] = { ...prev[index], quantity: newQty };
-                                      return next;
-                                    });
-                                  }}
-                                  className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
-                                />
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-center">
-                                <button
-                                  onClick={() =>
-                                    setCalculatedBOM((prev) => prev.filter((_, i) => i !== index))
-                                  }
-                                  className="text-red-600 hover:text-red-800 transition-colors"
-                                  title="Position entfernen"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    {/* Konfigurierte Komponenten */}
+                    {(() => {
+                      const configuredItems = calculatedBOM
+                        .map((item, index) => ({ ...item, originalIndex: index }))
+                        .filter(item => item.isConfigured);
+                      const autoItems = calculatedBOM
+                        .map((item, index) => ({ ...item, originalIndex: index }))
+                        .filter(item => !item.isConfigured && !item.isManual);
+                      const manualItems = calculatedBOM
+                        .map((item, index) => ({ ...item, originalIndex: index }))
+                        .filter(item => item.isManual);
+
+                      const renderTable = (items, title, bgColor, borderColor) => (
+                        items.length > 0 && (
+                          <div className={`border ${borderColor} rounded-lg overflow-hidden mb-4`}>
+                            <div className={`${bgColor} px-4 py-2 border-b ${borderColor}`}>
+                              <h4 className="font-semibold text-gray-800 text-sm flex items-center">
+                                {title}
+                                <span className="ml-2 text-xs font-normal text-gray-500">({items.length} Positionen)</span>
+                              </h4>
+                            </div>
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Material
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                                    Anzahl
+                                  </th>
+                                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                                    Aktion
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {items.map((item) => (
+                                  <tr key={`${item.materialID}-${item.originalIndex}`}>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      <div className="flex items-center space-x-2">
+                                        <span>{materialsById.get(item.materialID)?.description || item.description}</span>
+                                        {item.category && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                            {item.category}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => {
+                                          const newQty = Math.max(1, parseInt(e.target.value) || 1);
+                                          const idx = item.originalIndex;
+                                          setCalculatedBOM((prev) => {
+                                            const next = [...prev];
+                                            next[idx] = { ...prev[idx], quantity: newQty };
+                                            return next;
+                                          });
+                                        }}
+                                        className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-center">
+                                      <button
+                                        onClick={() => {
+                                          const idx = item.originalIndex;
+                                          setCalculatedBOM((prev) => prev.filter((_, i) => i !== idx));
+                                        }}
+                                        className="text-red-600 hover:text-red-800 transition-colors"
+                                        title="Position entfernen"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )
+                      );
+
+                      return (
+                        <div className="space-y-4">
+                          {renderTable(configuredItems, 'Konfigurierte Komponenten', 'bg-blue-50', 'border-blue-200')}
+                          {renderTable(autoItems, 'Automatisch berechnetes Material', 'bg-gray-50', 'border-gray-200')}
+                          {renderTable(manualItems, 'Manuell hinzugefügt', 'bg-green-50', 'border-green-200')}
+                        </div>
+                      );
+                    })()}
                   </>
                 ) : (
                   <p className="text-gray-500">Keine Materialien berechnet.</p>
@@ -2786,10 +2850,20 @@ const PVConfigurator = () => {
 
                   <button
                     onClick={handleBookToCustomer}
-                    disabled={!selectedCustomer || !selectedProject || calculatedBOM.length === 0 || warnings.length > 0}
-                    className="mt-4 w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    disabled={!selectedCustomer || !selectedProject || calculatedBOM.length === 0 || warnings.length > 0 || isBooking}
+                    className="mt-4 w-full bg-primary-600 text-white py-2 px-4 rounded-lg hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    Stückliste an Projekt buchen
+                    {isBooking ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Wird gebucht...
+                      </>
+                    ) : (
+                      'Stückliste an Projekt buchen'
+                    )}
                   </button>
                 </div>
               </div>

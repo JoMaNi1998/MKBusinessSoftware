@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { User, Building, FileText } from 'lucide-react';
 import { useProjects } from '../context/ProjectContext';
 import { useCustomers } from '../context/CustomerContext';
+import { useNotification } from '../context/NotificationContext';
 import { FirebaseService } from '../services/firebaseService';
 import BaseModal from './BaseModal';
 
 const VDEProjectSelectionModal = ({ isOpen, onClose, onSelectConfiguration }) => {
   const { projects } = useProjects();
   const { customers } = useCustomers();
+  const { showNotification } = useNotification();
   
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
@@ -72,7 +74,7 @@ const VDEProjectSelectionModal = ({ isOpen, onClose, onSelectConfiguration }) =>
 
   const handleGenerate = () => {
     if (!selectedCustomer || !selectedProject || !selectedConfiguration) {
-      alert('Bitte wählen Sie Kunde, Projekt und Konfiguration aus!');
+      showNotification('Bitte wählen Sie Kunde, Projekt und Konfiguration aus!', 'warning');
       return;
     }
 
