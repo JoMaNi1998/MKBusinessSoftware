@@ -269,7 +269,7 @@ export const InvoiceProvider = ({ children }) => {
     if (!dateString) return '-';
     try {
       const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
-      return date.toLocaleDateString('de-DE');
+      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch {
       return '-';
     }

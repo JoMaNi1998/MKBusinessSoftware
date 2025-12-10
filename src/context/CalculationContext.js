@@ -15,23 +15,21 @@ export const useCalculation = () => {
 const DEFAULT_SETTINGS = {
   // Stundensätze (netto)
   hourlyRates: {
-    meister: { rate: 72, label: 'Meister' },
-    geselle: { rate: 58, label: 'Geselle' },
-    helfer: { rate: 42, label: 'Helfer/Azubi' }
+    gesellePrivat: { rate: 58, label: 'Geselle (Privat)' },
+    geselleGewerbe: { rate: 68, label: 'Geselle (Gewerbe)' },
+    meisterPrivat: { rate: 72, label: 'Meister (Privat)' },
+    meisterGewerbe: { rate: 85, label: 'Meister (Gewerbe)' }
   },
 
   // Zuschläge in %
   margins: {
-    materialMarkup: 15,        // Materialaufschlag auf EK
-    profitMargin: 15,          // Gewinnmarge auf Selbstkosten
-    riskMargin: 5,             // Wagnis/Risiko
-    discountBuffer: 3          // Skonto-Puffer
+    defaultMaterialMarkup: 15, // Standard-Materialaufschlag für neue Positionen
+    materialMarkup: 15         // Materialaufschlag auf EK (legacy, für Fallback)
   },
 
   // Steuern
   tax: {
-    defaultRate: 19,           // Standard MwSt
-    reducedRate: 7             // Ermäßigt
+    defaultRate: 0             // Standard MwSt
   },
 
   // Arbeitszeitfaktoren pro Gewerk
@@ -47,11 +45,6 @@ const DEFAULT_SETTINGS = {
       { id: 'komplex', label: 'Komplex', laborFactor: 1.40 }
     ],
     geruest: [
-      { id: 'normal', label: 'Normal', laborFactor: 1.0 },
-      { id: 'aufwendig', label: 'Aufwendig', laborFactor: 1.15 },
-      { id: 'komplex', label: 'Komplex', laborFactor: 1.30 }
-    ],
-    fahrt: [
       { id: 'normal', label: 'Normal', laborFactor: 1.0 },
       { id: 'aufwendig', label: 'Aufwendig', laborFactor: 1.15 },
       { id: 'komplex', label: 'Komplex', laborFactor: 1.30 }
@@ -164,8 +157,8 @@ export const CalculationProvider = ({ children }) => {
   }, [settings.hourlyRates]);
 
   // Materialpreis mit Aufschlag berechnen
-  const calculateMaterialPrice = useCallback((purchasePrice) => {
-    const markup = settings.margins.materialMarkup / 100;
+  const calculateMaterialPrice = useCallback((purchasePrice, customMarkup = null) => {
+    const markup = (customMarkup !== null ? customMarkup : settings.margins.materialMarkup) / 100;
     return purchasePrice * (1 + markup);
   }, [settings.margins.materialMarkup]);
 
@@ -175,17 +168,13 @@ export const CalculationProvider = ({ children }) => {
     return (minutes / 60) * hourlyRate;
   }, [getHourlyRate]);
 
-  // Einheitspreis berechnen (Material + Lohn + Zuschläge)
+  // Einheitspreis berechnen (Material + Lohn)
   const calculateUnitPrice = useCallback((materialCost, laborCost) => {
-    const subtotal = materialCost + laborCost;
-    const profitMargin = settings.margins.profitMargin / 100;
-    const riskMargin = settings.margins.riskMargin / 100;
-
-    return subtotal * (1 + profitMargin + riskMargin);
-  }, [settings.margins]);
+    return materialCost + laborCost;
+  }, []);
 
   // Vollständige Positionskalkulation
-  const calculateServicePosition = useCallback((materials, laborItems, materialsData) => {
+  const calculateServicePosition = useCallback((materials, laborItems, materialsData, customMarkup = null) => {
     // Materialkosten berechnen
     let materialCostEK = 0;
     let materialCostVK = 0;
@@ -196,7 +185,7 @@ export const CalculationProvider = ({ children }) => {
       const quantity = mat.quantity || 1;
 
       materialCostEK += ekPrice * quantity;
-      materialCostVK += calculateMaterialPrice(ekPrice) * quantity;
+      materialCostVK += calculateMaterialPrice(ekPrice, customMarkup) * quantity;
     });
 
     // Lohnkosten berechnen
@@ -222,14 +211,14 @@ export const CalculationProvider = ({ children }) => {
   }, [calculateMaterialPrice, calculateLaborCost, calculateUnitPrice]);
 
   // MwSt berechnen
-  const calculateTax = useCallback((netAmount, reduced = false) => {
-    const rate = reduced ? settings.tax.reducedRate : settings.tax.defaultRate;
+  const calculateTax = useCallback((netAmount) => {
+    const rate = settings.tax.defaultRate ?? 0;
     return netAmount * (rate / 100);
   }, [settings.tax]);
 
   // Brutto berechnen
-  const calculateGross = useCallback((netAmount, reduced = false) => {
-    const tax = calculateTax(netAmount, reduced);
+  const calculateGross = useCallback((netAmount) => {
+    const tax = calculateTax(netAmount);
     return netAmount + tax;
   }, [calculateTax]);
 

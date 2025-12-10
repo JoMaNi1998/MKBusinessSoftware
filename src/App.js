@@ -8,6 +8,7 @@ import { CustomerProvider } from './context/CustomerContext';
 import { ProjectProvider } from './context/ProjectContext';
 import { BookingProvider } from './context/BookingContext';
 import { CalculationProvider } from './context/CalculationContext';
+import { CompanyProvider } from './context/CompanyContext';
 import { ServiceCatalogProvider } from './context/ServiceCatalogContext';
 import { OfferProvider } from './context/OfferContext';
 import { InvoiceProvider } from './context/InvoiceContext';
@@ -41,6 +42,7 @@ function App() {
               <BookingProvider>
                 <MaterialProvider>
                 <CalculationProvider>
+                <CompanyProvider>
                 <ServiceCatalogProvider>
                 <OfferProvider>
                 <InvoiceProvider>
@@ -84,6 +86,7 @@ function App() {
                 </InvoiceProvider>
                 </OfferProvider>
                 </ServiceCatalogProvider>
+                </CompanyProvider>
                 </CalculationProvider>
                 </MaterialProvider>
               </BookingProvider>

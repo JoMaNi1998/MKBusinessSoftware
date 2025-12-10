@@ -143,7 +143,7 @@ const VDEProtocols = () => {
   const formatDate = (date) => {
     if (!date) return '-';
     const d = new Date(date);
-    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('de-DE');
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const getStatusColor = (status) => {

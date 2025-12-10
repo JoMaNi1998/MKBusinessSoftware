@@ -12,12 +12,14 @@ import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
 import { OFFER_STATUS_LABELS, OFFER_STATUS } from '../../context/OfferContext';
 import { useInvoices } from '../../context/InvoiceContext';
+import { useCompany } from '../../context/CompanyContext';
 
 const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
   const navigate = useNavigate();
   const { customers } = useCustomers();
   const { projects } = useProjects();
   const { hasDepositInvoice, getInvoicesByOffer, createInvoiceFromOffer } = useInvoices();
+  const { company, offerTexts, footer, additionalPages } = useCompany();
   const [isCreatingInvoice, setIsCreatingInvoice] = React.useState(false);
 
   // Prüfen welcher Rechnungstyp als nächstes erstellt werden soll
@@ -43,7 +45,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
     if (!dateString) return '-';
     try {
       const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
-      return date.toLocaleDateString('de-DE');
+      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch {
       return dateString;
     }
@@ -146,28 +148,28 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
               <div className="flex justify-between items-start mb-8 pb-6 border-b">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
-                  <p className="text-gray-600 mt-1">{offer.offerNumber}</p>
                 </div>
                 <div className="text-right text-sm text-gray-600">
-                  <p className="font-medium text-gray-900">Ihr Unternehmen</p>
-                  <p>Musterstraße 123</p>
-                  <p>12345 Musterstadt</p>
-                  <p>Tel: 0123 456789</p>
-                  <p>info@unternehmen.de</p>
+                  <p className="font-medium text-gray-900">{company.name}</p>
+                  <p>{company.street}</p>
+                  <p>{company.zipCode} {company.city}</p>
+                  <p>Tel: {company.phone}</p>
+                  <p>{company.email}</p>
                 </div>
               </div>
 
               {/* Kunde & Datum */}
               <div className="grid grid-cols-2 gap-8 mb-8">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Empfänger</p>
                   <div className="text-sm">
-                    <p className="font-medium text-gray-900">
-                      {customer?.firmennameKundenname || customer?.name || '-'}
-                    </p>
-                    {customer?.strasse && <p>{customer.strasse}</p>}
-                    {(customer?.plz || customer?.ort) && (
-                      <p>{customer?.plz} {customer?.ort}</p>
+                    {project?.contactPersonName && (
+                      <p className="font-medium text-gray-900">{project.contactPersonName}</p>
+                    )}
+                    {(project?.street || project?.houseNumber) && (
+                      <p>{project.street} {project.houseNumber}</p>
+                    )}
+                    {(project?.postalCode || project?.city) && (
+                      <p>{project.postalCode} {project.city}</p>
                     )}
                   </div>
                 </div>
@@ -181,12 +183,6 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                       <span className="text-gray-500">Gültig bis:</span>
                       <span>{formatDate(offer.conditions?.validUntil)}</span>
                     </div>
-                    {project && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Projekt:</span>
-                        <span>{project.projektname || project.name}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -194,14 +190,14 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
               {/* Betreff */}
               <div className="mb-6">
                 <p className="font-medium text-gray-900">
-                  Betreff: Angebot {project ? `- ${project.projektname || project.name}` : ''}
+                  Angebot - {offer.offerNumber}
                 </p>
               </div>
 
               {/* Einleitung */}
               <div className="mb-6 text-sm text-gray-600">
                 <p>
-                  Vielen Dank für Ihre Anfrage. Wir freuen uns, Ihnen folgendes Angebot unterbreiten zu dürfen:
+                  {offerTexts.greeting}
                 </p>
               </div>
 
@@ -288,22 +284,63 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                 {(offer.depositPercent > 0) && (
                   <>
                     <p>
-                      Die Endzahlung erfolgt mit einer Frist von sieben Tagen nach Abschluss aller Montagearbeiten.
+                      {offerTexts.paymentTerms}
                     </p>
                     <p>
-                      Wir würden uns sehr freuen, wenn unser Angebot Ihre Zustimmung findet. Sie haben Fragen oder wünschen
-                      weitere Informationen? Rufen Sie uns an – wir sind für Sie da.
+                      {offerTexts.closing}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Durch Anzahlung stimmen Sie den Widerrufsbedingungen zu.
+                      {offerTexts.depositNote}
                     </p>
                   </>
                 )}
-                <p className="mt-4">Mit freundlichen Grüßen</p>
-                <p className="mt-2 font-medium text-gray-700">Ihr Unternehmen</p>
+                <p className="mt-4">{offerTexts.signature}</p>
+                <p className="mt-2 font-medium text-gray-700">{company.name}</p>
               </div>
+
+              {/* Fußzeile */}
+              {(footer?.column1 || footer?.column2 || footer?.column3) && (
+                <div className="mt-8 pt-4 border-t border-gray-300">
+                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+                    <div className="whitespace-pre-line">{footer?.column1}</div>
+                    <div className="whitespace-pre-line text-center">{footer?.column2}</div>
+                    <div className="whitespace-pre-line text-right">{footer?.column3}</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Zusätzliche Seiten */}
+          {additionalPages && additionalPages.length > 0 && additionalPages.map((page, index) => (
+            <div key={page.id || index} className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none mt-6 break-before-page">
+              <div className="p-8 print:p-0 min-h-[297mm] flex flex-col">
+                {/* Seiteninhalt */}
+                <div className="flex-1">
+                  {/* Seitentitel */}
+                  {page.title && (
+                    <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b">{page.title}</h2>
+                  )}
+
+                  {/* Seiteninhalt */}
+                  <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+                    {page.content}
+                  </div>
+                </div>
+
+                {/* Fußzeile auf zusätzlichen Seiten - immer unten */}
+                {(footer?.column1 || footer?.column2 || footer?.column3) && (
+                  <div className="mt-auto pt-4 border-t border-gray-300">
+                    <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+                      <div className="whitespace-pre-line">{footer?.column1}</div>
+                      <div className="whitespace-pre-line text-center">{footer?.column2}</div>
+                      <div className="whitespace-pre-line text-right">{footer?.column3}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -147,7 +147,7 @@ const addressFromParts = ({ street, houseNumber, postalCode, city }) => {
 const ContactForm = ({ value, onChange, onCancel, onSubmit, submitLabel = 'Hinzufügen' }) => {
   const v = value || { name: '', email: '', phone: '', position: '', notes: '' };
   const disabled =
-    !v.name?.trim() || !v.position?.trim() || !v.email?.trim() || !v.phone?.trim();
+    !v.name?.trim() || !v.email?.trim() || !v.phone?.trim();
 
   return (
     <div className="bg-gray-50 rounded-lg p-4 border">
@@ -168,7 +168,7 @@ const ContactForm = ({ value, onChange, onCancel, onSubmit, submitLabel = 'Hinzu
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
           <input
             type="text"
             value={v.position}
@@ -424,7 +424,6 @@ const CustomerModal = ({
   const handleAddOrUpdateContact = async () => {
     const required =
       contactForm.name.trim() &&
-      contactForm.position.trim() &&
       contactForm.email.trim() &&
       contactForm.phone.trim();
 
@@ -491,6 +490,11 @@ const CustomerModal = ({
     else if (!/^\d{5}$/.test(formData.postalCode.trim())) e.postalCode = 'PLZ muss 5 Ziffern haben';
     if (!formData.city.trim()) e.city = 'Stadt ist erforderlich';
 
+    // Mindestens ein Ansprechpartner erforderlich (nur bei create)
+    if (isCreate && contacts.length === 0) {
+      e.contacts = 'Mindestens ein Ansprechpartner ist erforderlich';
+    }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -543,6 +547,9 @@ const CustomerModal = ({
           const projectID = computeNextProjectId(projects);
           const projectName = `${sanitizeCustomerName(payload.firmennameKundenname)}${random4()}`;
 
+          // Ersten Ansprechpartner für das Projekt verwenden
+          const primaryContact = contacts[0] || null;
+
           await addProject({
             projectID,
             name: projectName,
@@ -555,7 +562,10 @@ const CustomerModal = ({
             city: payload.city,
             status: 'Geplant',
             description: '',
-            notes: ''
+            notes: '',
+            // Ansprechpartner zuweisen (mit korrekten Feldnamen)
+            contactPersonId: primaryContact?.id || '',
+            contactPersonName: primaryContact?.name || ''
           });
           showNotification(`Projekt "${projectName}" automatisch erstellt`, 'info');
         } catch (projErr) {
@@ -1018,13 +1028,17 @@ const CustomerModal = ({
         {/* Ansprechpartner (lokal verwaltet) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-gray-900">Ansprechpartner ({contacts.length})</h3>
+            <h3 className="text-lg font-medium text-gray-900">Ansprechpartner ({contacts.length}) *</h3>
             <button
               type="button"
               onClick={() => {
                 setShowAddContact(true);
                 setEditingContact(null);
                 setContactForm({ name: '', email: '', phone: '', position: '', notes: '' });
+                // Fehlermeldung entfernen wenn Kontaktformular geöffnet wird
+                if (errors.contacts) {
+                  setErrors((prev) => ({ ...prev, contacts: '' }));
+                }
               }}
               className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center space-x-2 text-sm"
             >
@@ -1032,6 +1046,10 @@ const CustomerModal = ({
               <span>Kontakt hinzufügen</span>
             </button>
           </div>
+
+          {errors.contacts && !showAddContact && (
+            <p className="text-sm text-red-600">{errors.contacts}</p>
+          )}
 
           {/* Liste */}
           {contacts.length === 0 ? (

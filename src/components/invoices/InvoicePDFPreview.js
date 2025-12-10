@@ -9,10 +9,12 @@ import {
 import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
 import { INVOICE_STATUS_LABELS, INVOICE_TYPE, INVOICE_TYPE_LABELS } from '../../context/InvoiceContext';
+import { useCompany } from '../../context/CompanyContext';
 
 const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
   const { customers } = useCustomers();
   const { projects } = useProjects();
+  const { company, invoiceTexts, footer, additionalPages } = useCompany();
 
   const customer = useMemo(() => {
     return customers.find(c => c.id === invoice?.customerID);
@@ -33,7 +35,7 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
     if (!dateString) return '-';
     try {
       const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
-      return date.toLocaleDateString('de-DE');
+      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch {
       return dateString;
     }
@@ -123,25 +125,26 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
                   )}
                 </div>
                 <div className="text-right text-sm text-gray-600">
-                  <p className="font-medium text-gray-900">Ihr Unternehmen</p>
-                  <p>Musterstraße 123</p>
-                  <p>12345 Musterstadt</p>
-                  <p>Tel: 0123 456789</p>
-                  <p>info@unternehmen.de</p>
+                  <p className="font-medium text-gray-900">{company.name}</p>
+                  <p>{company.street}</p>
+                  <p>{company.zipCode} {company.city}</p>
+                  <p>Tel: {company.phone}</p>
+                  <p>{company.email}</p>
                 </div>
               </div>
 
               {/* Kunde & Datum */}
               <div className="grid grid-cols-2 gap-8 mb-8">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Rechnungsempfänger</p>
                   <div className="text-sm">
-                    <p className="font-medium text-gray-900">
-                      {customer?.firmennameKundenname || customer?.name || '-'}
-                    </p>
-                    {customer?.strasse && <p>{customer.strasse}</p>}
-                    {(customer?.plz || customer?.ort) && (
-                      <p>{customer?.plz} {customer?.ort}</p>
+                    {project?.contactPersonName && (
+                      <p className="font-medium text-gray-900">{project.contactPersonName}</p>
+                    )}
+                    {(project?.street || project?.houseNumber) && (
+                      <p>{project.street} {project.houseNumber}</p>
+                    )}
+                    {(project?.postalCode || project?.city) && (
+                      <p>{project.postalCode} {project.city}</p>
                     )}
                   </div>
                 </div>
@@ -155,27 +158,17 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
                       <span className="text-gray-500">Fällig am:</span>
                       <span className="font-medium">{formatDate(invoice.dueDate)}</span>
                     </div>
-                    {project && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Projekt:</span>
-                        <span>{project.projektname || project.name}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Betreff */}
+              {/* Betreff & Einleitung */}
               <div className="mb-6">
-                <p className="font-medium text-gray-900">
-                  Betreff: Rechnung {project ? `- ${project.projektname || project.name}` : ''}
-                </p>
-              </div>
-
-              {/* Einleitung */}
-              <div className="mb-6 text-sm text-gray-600">
-                <p>
-                  Für die erbrachten Leistungen erlauben wir uns, Ihnen folgende Positionen in Rechnung zu stellen:
+                <h2 className="text-base font-semibold text-gray-900 mb-2">
+                  Rechnung - {invoice.invoiceNumber}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {invoiceTexts.greeting}
                 </p>
               </div>
 
@@ -266,12 +259,15 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
                     <p className="font-medium">{formatDate(invoice.dueDate)}</p>
                   </div>
                 </div>
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500 mb-1">Bankverbindung:</p>
-                  <p>IBAN: DE89 3704 0044 0532 0130 00</p>
-                  <p>BIC: COBADEFFXXX</p>
-                  <p className="mt-1">Verwendungszweck: {invoice.invoiceNumber}</p>
-                </div>
+                {(company.iban || company.bic) && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 mb-1">Bankverbindung:</p>
+                    {company.bankName && <p>{company.bankName}</p>}
+                    {company.iban && <p>IBAN: {company.iban}</p>}
+                    {company.bic && <p>BIC: {company.bic}</p>}
+                    <p className="mt-1">Verwendungszweck: {invoice.invoiceNumber}</p>
+                  </div>
+                )}
               </div>
 
               {/* Notizen */}
@@ -285,14 +281,50 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
               {/* Footer */}
               <div className="border-t pt-6 text-sm text-gray-500">
                 <p>
-                  Bitte überweisen Sie den Betrag von <strong>{formatPrice(invoice.totals?.grossTotal)}</strong> bis
-                  zum <strong>{formatDate(invoice.dueDate)}</strong> auf das oben genannte Konto.
+                  {invoiceTexts.paymentTerms}
                 </p>
-                <p className="mt-4">Vielen Dank für Ihr Vertrauen!</p>
-                <p className="mt-4 font-medium text-gray-700">Ihr Unternehmen</p>
+                <p className="mt-4">{invoiceTexts.closing}</p>
+                <p className="mt-4">{invoiceTexts.signature}</p>
+                <p className="mt-2 font-medium text-gray-700">{company.name}</p>
               </div>
+
+              {/* Fußzeile */}
+              {(footer?.column1 || footer?.column2 || footer?.column3) && (
+                <div className="mt-8 pt-4 border-t border-gray-300">
+                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+                    <div className="whitespace-pre-line">{footer?.column1}</div>
+                    <div className="whitespace-pre-line text-center">{footer?.column2}</div>
+                    <div className="whitespace-pre-line text-right">{footer?.column3}</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Zusätzliche Seiten */}
+          {additionalPages && additionalPages.length > 0 && additionalPages.map((page, index) => (
+            <div key={page.id || index} className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none mt-6 break-before-page">
+              <div className="p-8 print:p-0 min-h-[297mm] flex flex-col">
+                <div className="flex-1">
+                  {page.title && (
+                    <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b">{page.title}</h2>
+                  )}
+                  <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+                    {page.content}
+                  </div>
+                </div>
+                {(footer?.column1 || footer?.column2 || footer?.column3) && (
+                  <div className="mt-auto pt-4 border-t border-gray-300">
+                    <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+                      <div className="whitespace-pre-line">{footer?.column1}</div>
+                      <div className="whitespace-pre-line text-center">{footer?.column2}</div>
+                      <div className="whitespace-pre-line text-right">{footer?.column3}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

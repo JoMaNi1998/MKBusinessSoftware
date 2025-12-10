@@ -78,7 +78,7 @@ const formatDate = (date) => {
     else if (date?.seconds) d = new Date(date.seconds * 1000);
     else return 'Ungültiges Datum';
     if (isNaN(d.getTime())) return 'Ungültiges Datum';
-    return d.toLocaleDateString('de-DE');
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   } catch {
     return 'Ungültiges Datum';
   }

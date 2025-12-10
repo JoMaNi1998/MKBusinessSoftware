@@ -39,6 +39,25 @@ export const unsanitizeDocumentId = (id) => {
     .replace(/-DOLLAR-/g, '$');
 };
 
+// Entfernt undefined-Werte aus einem Objekt (rekursiv)
+// Firebase akzeptiert keine undefined-Werte
+export const removeUndefined = (obj) => {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefined(item)).filter(item => item !== undefined);
+  }
+  if (typeof obj === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefined(value);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+};
+
 // Collection Namen
 export const COLLECTIONS = {
   MATERIALS: 'materials',
@@ -46,6 +65,7 @@ export const COLLECTIONS = {
   BOOKINGS: 'bookings',
   PROJECTS: 'projects',
   CALCULATION_SETTINGS: 'calculation-settings',
+  COMPANY_SETTINGS: 'company-settings',
   SERVICE_CATALOG: 'service-catalog',
   OFFERS: 'offers',
   OFFER_TEMPLATES: 'offer-templates',
@@ -60,9 +80,12 @@ export class FirebaseService {
     try {
       // Verwende die originale ID als Firestore Document ID (bereinigt)
       const sanitizedId = sanitizeDocumentId(data.id || data.materialID || data.customerID);
-      
+
+      // Undefined-Werte entfernen (Firebase akzeptiert diese nicht)
+      const cleanedData = removeUndefined(data);
+
       const docData = {
-        ...data,
+        ...cleanedData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -155,8 +178,12 @@ export class FirebaseService {
       }
       const sanitizedId = sanitizeDocumentId(docId);
       const docRef = doc(db, collectionName, sanitizedId);
+
+      // Undefined-Werte entfernen (Firebase akzeptiert diese nicht)
+      const cleanedData = removeUndefined(data);
+
       await updateDoc(docRef, {
-        ...data,
+        ...cleanedData,
         updatedAt: serverTimestamp()
       });
     } catch (error) {
@@ -351,6 +378,55 @@ export class CalculationSettingsService {
       },
       (error) => {
         console.error('Error in settings listener:', error);
+        callback(null);
+      }
+    );
+  }
+}
+
+// Company Settings Service (Firmendaten & Texte)
+export class CompanySettingsService {
+  static async getSettings() {
+    try {
+      const settings = await FirebaseService.getDocument(COLLECTIONS.COMPANY_SETTINGS, 'default');
+      return settings;
+    } catch (error) {
+      console.error('Error getting company settings:', error);
+      return null;
+    }
+  }
+
+  static async saveSettings(settingsData) {
+    try {
+      const existingSettings = await this.getSettings();
+      if (existingSettings) {
+        await FirebaseService.updateDocument(COLLECTIONS.COMPANY_SETTINGS, 'default', settingsData);
+      } else {
+        await setDoc(doc(db, COLLECTIONS.COMPANY_SETTINGS, 'default'), {
+          ...settingsData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving company settings:', error);
+      throw error;
+    }
+  }
+
+  static subscribeToSettings(callback) {
+    const docRef = doc(db, COLLECTIONS.COMPANY_SETTINGS, 'default');
+    return onSnapshot(docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          callback({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          callback(null);
+        }
+      },
+      (error) => {
+        console.error('Error in company settings listener:', error);
         callback(null);
       }
     );

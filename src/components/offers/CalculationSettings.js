@@ -13,8 +13,7 @@ import {
   Trash2,
   Home,
   Zap,
-  Layers,
-  Car
+  Layers
 } from 'lucide-react';
 import { useCalculation } from '../../context/CalculationContext';
 import { useNotification } from '../../context/NotificationContext';
@@ -32,14 +31,9 @@ const LABOR_FACTOR_CONFIG = {
     icon: Zap
   },
   geruest: {
-    label: 'Gerüst',
-    description: 'Aufschlag für Gerüstarbeiten',
+    label: 'Gerüst & Logistik',
+    description: 'Aufschlag für Gerüst- und Logistikarbeiten',
     icon: Layers
-  },
-  fahrt: {
-    label: 'Fahrt',
-    description: 'Aufschlag für alle Leistungen basierend auf Anfahrt',
-    icon: Car
   }
 };
 
@@ -158,7 +152,7 @@ const CalculationSettings = () => {
           Diese Stundensätze werden für die Kalkulation von Arbeitszeiten in Leistungspositionen verwendet.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {Object.entries(localSettings.hourlyRates || {}).map(([role, data]) => (
             <div key={role}>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -189,115 +183,44 @@ const CalculationSettings = () => {
           <h3 className="text-base font-medium text-gray-900">Zuschläge & Margen</h3>
         </div>
         <p className="text-sm text-gray-500 mb-4">
-          Aufschläge für Material und Gewinnmargen auf Selbstkosten.
+          Standardwert für den Materialaufschlag bei neuen Leistungspositionen.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Materialaufschlag
-              <span className="ml-1 text-gray-400 cursor-help" title="Aufschlag auf Einkaufspreise">
-                <Info className="h-3 w-3 inline" />
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={localSettings.margins?.materialMarkup || 0}
-                onChange={(e) => handleChange('margins', 'materialMarkup', parseFloat(e.target.value) || 0)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Gewinnmarge
-              <span className="ml-1 text-gray-400 cursor-help" title="Aufschlag auf Selbstkosten">
-                <Info className="h-3 w-3 inline" />
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={localSettings.margins?.profitMargin || 0}
-                onChange={(e) => handleChange('margins', 'profitMargin', parseFloat(e.target.value) || 0)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Wagnis/Risiko
-              <span className="ml-1 text-gray-400 cursor-help" title="Risikoaufschlag auf Selbstkosten">
-                <Info className="h-3 w-3 inline" />
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={localSettings.margins?.riskMargin || 0}
-                onChange={(e) => handleChange('margins', 'riskMargin', parseFloat(e.target.value) || 0)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Skonto-Puffer
-              <span className="ml-1 text-gray-400 cursor-help" title="Optionaler Puffer für Skontogewährung">
-                <Info className="h-3 w-3 inline" />
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={localSettings.margins?.discountBuffer || 0}
-                onChange={(e) => handleChange('margins', 'discountBuffer', parseFloat(e.target.value) || 0)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
-            </div>
+        <div className="max-w-xs">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Standard-Materialaufschlag
+            <span className="ml-1 text-gray-400 cursor-help" title="Standardwert für neue Leistungspositionen">
+              <Info className="h-3 w-3 inline" />
+            </span>
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={localSettings.margins?.defaultMaterialMarkup ?? 15}
+              onChange={(e) => handleChange('margins', 'defaultMaterialMarkup', parseFloat(e.target.value) || 0)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
           </div>
         </div>
 
         {/* Kalkulationsübersicht */}
         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Kalkulationsbeispiel</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Kalkulationsbeispiel (bei 15% Materialaufschlag)</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-gray-500">Material EK:</span>
               <span className="block font-medium">100,00 €</span>
             </div>
             <div>
-              <span className="text-gray-500">+ Aufschlag ({localSettings.margins?.materialMarkup || 0}%):</span>
-              <span className="block font-medium">{(100 * (localSettings.margins?.materialMarkup || 0) / 100).toFixed(2)} €</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Lohnkosten:</span>
-              <span className="block font-medium">50,00 €</span>
+              <span className="text-gray-500">+ Aufschlag (15%):</span>
+              <span className="block font-medium">115,00 €</span>
             </div>
             <div className="border-l-2 border-blue-500 pl-3">
-              <span className="text-gray-500">Einheitspreis:</span>
-              <span className="block font-bold text-blue-600">
-                {(
-                  (100 * (1 + (localSettings.margins?.materialMarkup || 0) / 100) + 50) *
-                  (1 + (localSettings.margins?.profitMargin || 0) / 100 + (localSettings.margins?.riskMargin || 0) / 100)
-                ).toFixed(2)} €
-              </span>
+              <span className="text-gray-500">+ Lohnkosten:</span>
+              <span className="block font-bold text-blue-600">= Einheitspreis</span>
             </div>
           </div>
         </div>
@@ -369,7 +292,7 @@ const CalculationSettings = () => {
         {/* Info-Box */}
         <div className="mt-6 p-4 bg-amber-50 rounded-lg text-sm">
           <p className="text-amber-800">
-            <strong>Zuordnung:</strong> Dach → PV-Montage, Elektro → Elektroinstallation, Gerüst → Gerüstarbeiten, Fahrt → alle Leistungen
+            <strong>Zuordnung:</strong> Dach → PV-Montage & Optimierer, Elektro → Wechselrichter, Speicher, Wallbox, Notstrom, Energiemanagement, Elektroinstallation, Gerüst & Logistik → Gerüstarbeiten
           </p>
         </div>
       </div>
@@ -566,25 +489,8 @@ const CalculationSettings = () => {
                 type="number"
                 min="0"
                 max="100"
-                value={localSettings.tax?.defaultRate || 19}
-                onChange={(e) => handleChange('tax', 'defaultRate', parseFloat(e.target.value) || 19)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ermäßigter Satz (optional)
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={localSettings.tax?.reducedRate || 7}
-                onChange={(e) => handleChange('tax', 'reducedRate', parseFloat(e.target.value) || 7)}
+                value={localSettings.tax?.defaultRate ?? 0}
+                onChange={(e) => handleChange('tax', 'defaultRate', parseFloat(e.target.value) ?? 0)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>

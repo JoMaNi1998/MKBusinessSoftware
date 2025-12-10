@@ -27,7 +27,10 @@ import {
   Power,
   Target,
   Cpu,
-  Sun
+  Sun,
+  Plug,
+  Truck,
+  MoreHorizontal
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useOffers, OFFER_STATUS } from '../../context/OfferContext';
@@ -37,6 +40,8 @@ import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
 import { useMaterials } from '../../context/MaterialContext';
 import { useNotification } from '../../context/NotificationContext';
+import { useCompany } from '../../context/CompanyContext';
+import { OfferService } from '../../services/firebaseService';
 import BaseModal from '../BaseModal';
 import { OFFER_STATUS_LABELS } from '../../context/OfferContext';
 
@@ -45,7 +50,7 @@ const STEPS = [
   { id: 0, title: 'Kunde', icon: Users },
   { id: 1, title: 'Leistungen', icon: Package },
   { id: 2, title: 'Positionen', icon: Edit },
-  { id: 3, title: 'Vorschau', icon: Eye }
+  { id: 3, title: 'Zusammenfassung', icon: Eye }
 ];
 
 const OfferConfigurator = () => {
@@ -60,6 +65,7 @@ const OfferConfigurator = () => {
   const { projects } = useProjects();
   const { materials } = useMaterials();
   const { showNotification } = useNotification();
+  const { company, offerTexts, footer, additionalPages } = useCompany();
 
   // State
   const [currentStep, setCurrentStep] = useState(0);
@@ -96,16 +102,14 @@ const OfferConfigurator = () => {
   const [laborFactorSelections, setLaborFactorSelections] = useState({
     dach: 'normal',
     elektro: 'normal',
-    geruest: 'normal',
-    fahrt: 'normal'
+    geruest: 'normal'
   });
 
   // Labels für Arbeitszeitfaktoren
   const LABOR_FACTOR_LABELS = {
     dach: 'Dach',
     elektro: 'Elektro',
-    geruest: 'Gerüst',
-    fahrt: 'Fahrt'
+    geruest: 'Gerüst & Logistik'
   };
 
   // Generische Faktor-Lookup Funktion
@@ -120,23 +124,31 @@ const OfferConfigurator = () => {
 
   // Dropdown-basierte Auswahl für Hauptkategorien
   const [selectedServices, setSelectedServices] = useState({
-    module: '',
+    'pv-montage': '',
     wechselrichter: '',
     speicher: '',
     wallbox: '',
     notstrom: '',
     optimierer: '',
-    energiemanagement: ''
+    energiemanagement: '',
+    elektroinstallation: '',
+    planung: '',
+    geruest: '',
+    erdungsanlage: ''
   });
 
   const [serviceQuantities, setServiceQuantities] = useState({
-    module: 10,
+    'pv-montage': 10,
     wechselrichter: 1,
     speicher: 1,
     wallbox: 1,
     notstrom: 1,
     optimierer: 0,
-    energiemanagement: 1
+    energiemanagement: 1,
+    elektroinstallation: 1,
+    planung: 1,
+    geruest: 1,
+    erdungsanlage: 1
   });
 
   // Dropdown-Kategorien (nur Kategorien mit isDropdown=true)
@@ -144,7 +156,7 @@ const OfferConfigurator = () => {
 
   // Icon-Mapping für Dropdown-Kategorien
   const CATEGORY_ICONS = {
-    Sun, Zap, Battery, Car, Power, Target, Cpu
+    Sun, Zap, Battery, Car, Power, Target, Cpu, Plug, FileText, Truck, MoreHorizontal
   };
 
   // Service-Name anhand ID finden
@@ -166,12 +178,39 @@ const OfferConfigurator = () => {
         setSelectedCustomer(existingOffer.customerID || '');
         setSelectedProject(existingOffer.projectID || '');
         setOfferData({
+          offerNumber: existingOffer.offerNumber || '',
           items: existingOffer.items || [],
           totals: existingOffer.totals || {},
-          conditions: existingOffer.conditions || {}
+          conditions: existingOffer.conditions || {},
+          depositPercent: existingOffer.depositPercent ?? 50
         });
+
+        // selectedServices und serviceQuantities aus Items rekonstruieren
+        const reconstructedServices = {};
+        const reconstructedQuantities = {};
+
+        (existingOffer.items || []).forEach(item => {
+          if (item.category && item.serviceID) {
+            reconstructedServices[item.category] = item.serviceID;
+            reconstructedQuantities[item.category] = item.quantity || 1;
+          }
+        });
+
+        setSelectedServices(prev => ({ ...prev, ...reconstructedServices }));
+        setServiceQuantities(prev => ({ ...prev, ...reconstructedQuantities }));
       }
     } else {
+      // Angebotsnummer für neues Angebot generieren
+      const generateOfferNumber = async () => {
+        try {
+          const offerNumber = await OfferService.getNextOfferNumber();
+          setOfferData(prev => ({ ...prev, offerNumber }));
+        } catch (err) {
+          console.error('Error generating offer number:', err);
+        }
+      };
+      generateOfferNumber();
+
       // Defaults setzen
       setOfferData(prev => ({
         ...prev,
@@ -264,25 +303,21 @@ const OfferConfigurator = () => {
     const appliedFactors = {};
 
     // Faktor basierend auf Service-Kategorie
-    if (service.category === 'pv-montage') {
+    if (service.category === 'pv-montage' || service.category === 'optimierer') {
+      // Dach-Faktor für PV-Montage und Optimierer
       const dachFactor = getLaborFactor('dach');
       laborFactor = dachFactor;
       if (dachFactor > 1) appliedFactors.dach = dachFactor;
-    } else if (service.category === 'elektroinstallation') {
+    } else if (['elektroinstallation', 'wechselrichter', 'speicher', 'wallbox', 'notstrom', 'energiemanagement', 'erdungsanlage'].includes(service.category)) {
+      // Elektro-Faktor für alle Elektro-Kategorien
       const elektroFactor = getLaborFactor('elektro');
       laborFactor = elektroFactor;
       if (elektroFactor > 1) appliedFactors.elektro = elektroFactor;
     } else if (service.category === 'geruest') {
+      // Gerüst & Logistik Faktor
       const geruestFactor = getLaborFactor('geruest');
       laborFactor = geruestFactor;
       if (geruestFactor > 1) appliedFactors.geruest = geruestFactor;
-    }
-
-    // Fahrt gilt für alle Leistungen
-    const fahrtFactor = getLaborFactor('fahrt');
-    if (fahrtFactor > 1) {
-      laborFactor *= fahrtFactor;
-      appliedFactors.fahrt = fahrtFactor;
     }
 
     // Preise mit Faktor anpassen
@@ -300,11 +335,11 @@ const OfferConfigurator = () => {
       position: offerData.items.length + 1,
       type: 'service',
       serviceID: service.id,
-      category: service.category,
-      shortText: service.shortText,
-      longText: service.longText,
+      category: service.category || '',
+      shortText: service.shortText || '',
+      longText: service.longText || '',
       quantity: 1,
-      unit: service.unit,
+      unit: service.unit || 'Stk',
       unitPriceNet: adjustedUnitPrice,
       originalUnitPrice: originalUnitPrice,
       priceOverridden: laborFactor !== 1.0,
@@ -313,18 +348,24 @@ const OfferConfigurator = () => {
       laborFactor: laborFactor,
       appliedFactors: appliedFactors,
       breakdown: {
-        materials: service.materials,
-        labor: service.labor,
+        materials: service.materials || [],
+        labor: service.labor || [],
         materialCost: materialCost,
         laborCost: adjustedLaborCost,
         originalLaborCost: originalLaborCost
       }
     };
 
-    setOfferData(prev => ({
-      ...prev,
-      items: [...prev.items, newItem]
-    }));
+    setOfferData(prev => {
+      // Standard-Positionen ans Ende sortieren
+      const regularItems = prev.items.filter(item => !item.isDefaultPosition);
+      const defaultItems = prev.items.filter(item => item.isDefaultPosition);
+      const allItems = [...regularItems, newItem, ...defaultItems].map((item, index) => ({
+        ...item,
+        position: index + 1
+      }));
+      return { ...prev, items: allItems };
+    });
 
     const factorInfo = laborFactor > 1 ? ` (+${Math.round((laborFactor - 1) * 100)}% Arbeitszeit)` : '';
     showNotification(`Position hinzugefügt${factorInfo}`, 'success');
@@ -334,7 +375,7 @@ const OfferConfigurator = () => {
   const handleAddManualItem = () => {
     const newItem = {
       id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      position: offerData.items.length + 1,
+      position: 0, // Position wird später gesetzt
       type: 'manual',
       serviceID: null,
       shortText: 'Neue Position',
@@ -348,10 +389,16 @@ const OfferConfigurator = () => {
       totalNet: 0
     };
 
-    setOfferData(prev => ({
-      ...prev,
-      items: [...prev.items, newItem]
-    }));
+    setOfferData(prev => {
+      // Standard-Positionen ans Ende sortieren
+      const regularItems = prev.items.filter(item => !item.isDefaultPosition);
+      const defaultItems = prev.items.filter(item => item.isDefaultPosition);
+      const allItems = [...regularItems, newItem, ...defaultItems].map((item, index) => ({
+        ...item,
+        position: index + 1
+      }));
+      return { ...prev, items: allItems };
+    });
   };
 
   // Position aktualisieren
@@ -436,12 +483,9 @@ const OfferConfigurator = () => {
     }));
   }, []);
 
-  // Synchronisiere Dropdown-Auswahl mit Items
+  // Synchronisiere Dropdown-Auswahl mit Items (inkl. Arbeitszeitfaktoren)
   useEffect(() => {
-    // Nur bei neuen Angeboten automatisch synchronisieren
-    if (isEditing) return;
-
-    const newItems = [];
+    const dropdownItems = [];
 
     Object.entries(selectedServices).forEach(([categoryId, serviceId]) => {
       if (!serviceId || serviceQuantities[categoryId] <= 0) return;
@@ -449,73 +493,135 @@ const OfferConfigurator = () => {
       const service = getServiceById(serviceId);
       if (!service) return;
 
-      // Prüfen ob bereits hinzugefügt (als dropdown-item)
-      const existingItem = offerData.items.find(
-        item => item.serviceID === serviceId && item.sourceType === 'dropdown'
-      );
+      // Arbeitszeitfaktoren berechnen - kategorie-spezifisch!
+      let laborFactor = 1.0;
+      const appliedFactors = {};
 
-      if (!existingItem) {
-        // Arbeitszeitfaktoren berechnen
+      // Kategorie-spezifischer Faktor
+      if (categoryId === 'pv-montage' || categoryId === 'optimierer') {
+        // Dach-Faktor für PV-Montage und Optimierer
+        const dachFactor = getLaborFactor('dach');
+        laborFactor = dachFactor;
+        if (dachFactor > 1) appliedFactors.dach = dachFactor;
+      } else if (['elektroinstallation', 'wechselrichter', 'speicher', 'wallbox', 'notstrom', 'energiemanagement', 'erdungsanlage'].includes(categoryId)) {
+        // Elektro-Faktor für alle Elektro-Kategorien
+        const elektroFactor = getLaborFactor('elektro');
+        laborFactor = elektroFactor;
+        if (elektroFactor > 1) appliedFactors.elektro = elektroFactor;
+      } else if (categoryId === 'geruest') {
+        // Gerüst & Logistik Faktor
+        const geruestFactor = getLaborFactor('geruest');
+        laborFactor = geruestFactor;
+        if (geruestFactor > 1) appliedFactors.geruest = geruestFactor;
+      }
+
+      const originalLaborCost = service.calculatedPrices?.laborCost || 0;
+      const adjustedLaborCost = originalLaborCost * laborFactor;
+      const materialCost = service.calculatedPrices?.materialCostVK || 0;
+      const originalUnitPrice = service.calculatedPrices?.unitPriceNet || 0;
+      const laborDiff = adjustedLaborCost - originalLaborCost;
+      const adjustedUnitPrice = originalUnitPrice + laborDiff;
+      const quantity = serviceQuantities[categoryId];
+
+      dropdownItems.push({
+        id: `item-dropdown-${categoryId}-${serviceId}`,
+        position: 0, // Position wird später gesetzt
+        type: 'service',
+        sourceType: 'dropdown',
+        serviceID: serviceId,
+        category: categoryId,
+        shortText: service.shortText || '',
+        longText: service.longText || '',
+        quantity: quantity,
+        unit: service.unit || 'Stk',
+        unitPriceNet: adjustedUnitPrice,
+        originalUnitPrice: originalUnitPrice,
+        priceOverridden: laborFactor !== 1.0,
+        discount: 0,
+        totalNet: quantity * adjustedUnitPrice,
+        laborFactor: laborFactor,
+        appliedFactors: appliedFactors,
+        isPackage: service.isPackage || false,
+        subItems: service.subItems || [],
+        breakdown: {
+          materials: service.materials || [],
+          labor: service.labor || [],
+          materialCost: materialCost,
+          laborCost: adjustedLaborCost,
+          originalLaborCost: originalLaborCost
+        }
+      });
+    });
+
+    // Immer Dropdown-Items aktualisieren (nicht nur wenn neue hinzukommen)
+    setOfferData(prev => {
+      // Bestehende Dropdown-Items entfernen und neue hinzufügen
+      const nonDropdownItems = prev.items.filter(item => item.sourceType !== 'dropdown');
+      const combinedItems = [...nonDropdownItems, ...dropdownItems];
+
+      // Sortieren: Standard-Positionen (isDefaultPosition) immer ans Ende
+      const regularItems = combinedItems.filter(item => !item.isDefaultPosition);
+      const defaultItems = combinedItems.filter(item => item.isDefaultPosition);
+      const allItems = [...regularItems, ...defaultItems].map((item, index) => ({
+        ...item,
+        position: index + 1
+      }));
+      return { ...prev, items: allItems };
+    });
+  }, [selectedServices, serviceQuantities, laborFactorSelections, getServiceById, getLaborFactor]);
+
+  // Aktualisiere alle Positionen bei Änderung der Arbeitszeitfaktoren
+  useEffect(() => {
+    setOfferData(prev => {
+      const updatedItems = prev.items.map(item => {
+        // Nur Items mit serviceID und ohne sourceType='dropdown' (die werden separat aktualisiert)
+        if (!item.serviceID || item.sourceType === 'dropdown') return item;
+
+        // Arbeitszeitfaktor für die Kategorie ermitteln
         let laborFactor = 1.0;
         const appliedFactors = {};
+        const categoryId = item.category;
 
-        const fahrtFactor = getLaborFactor('fahrt');
-        if (fahrtFactor > 1) {
-          laborFactor *= fahrtFactor;
-          appliedFactors.fahrt = fahrtFactor;
+        if (categoryId === 'pv-montage' || categoryId === 'optimierer') {
+          const dachFactor = getLaborFactor('dach');
+          laborFactor = dachFactor;
+          if (dachFactor > 1) appliedFactors.dach = dachFactor;
+        } else if (['elektroinstallation', 'wechselrichter', 'speicher', 'wallbox', 'notstrom', 'energiemanagement', 'erdungsanlage'].includes(categoryId)) {
+          const elektroFactor = getLaborFactor('elektro');
+          laborFactor = elektroFactor;
+          if (elektroFactor > 1) appliedFactors.elektro = elektroFactor;
+        } else if (categoryId === 'geruest') {
+          const geruestFactor = getLaborFactor('geruest');
+          laborFactor = geruestFactor;
+          if (geruestFactor > 1) appliedFactors.geruest = geruestFactor;
         }
 
-        const originalLaborCost = service.calculatedPrices?.laborCost || 0;
+        // Preise neu berechnen
+        const originalLaborCost = item.breakdown?.originalLaborCost || item.breakdown?.laborCost || 0;
         const adjustedLaborCost = originalLaborCost * laborFactor;
-        const materialCost = service.calculatedPrices?.materialCostVK || 0;
-        const originalUnitPrice = service.calculatedPrices?.unitPriceNet || 0;
+        const originalUnitPrice = item.originalUnitPrice || item.unitPriceNet;
         const laborDiff = adjustedLaborCost - originalLaborCost;
         const adjustedUnitPrice = originalUnitPrice + laborDiff;
-        const quantity = serviceQuantities[categoryId];
 
-        newItems.push({
-          id: `item-dropdown-${categoryId}-${serviceId}`,
-          position: 0, // Position wird später gesetzt
-          type: 'service',
-          sourceType: 'dropdown',
-          serviceID: serviceId,
-          category: categoryId,
-          shortText: service.shortText,
-          longText: service.longText,
-          quantity: quantity,
-          unit: service.unit,
+        return {
+          ...item,
           unitPriceNet: adjustedUnitPrice,
           originalUnitPrice: originalUnitPrice,
-          priceOverridden: laborFactor !== 1.0,
-          discount: 0,
-          totalNet: quantity * adjustedUnitPrice,
+          totalNet: item.quantity * adjustedUnitPrice * (1 - (item.discount || 0) / 100),
           laborFactor: laborFactor,
           appliedFactors: appliedFactors,
-          isPackage: service.isPackage,
-          subItems: service.subItems,
+          priceOverridden: laborFactor !== 1.0,
           breakdown: {
-            materials: service.materials,
-            labor: service.labor,
-            materialCost: materialCost,
+            ...item.breakdown,
             laborCost: adjustedLaborCost,
             originalLaborCost: originalLaborCost
           }
-        });
-      }
-    });
-
-    if (newItems.length > 0) {
-      setOfferData(prev => {
-        // Bestehende Dropdown-Items entfernen und neue hinzufügen
-        const nonDropdownItems = prev.items.filter(item => item.sourceType !== 'dropdown');
-        const allItems = [...nonDropdownItems, ...newItems].map((item, index) => ({
-          ...item,
-          position: index + 1
-        }));
-        return { ...prev, items: allItems };
+        };
       });
-    }
-  }, [selectedServices, serviceQuantities, getServiceById, getLaborFactor, isEditing]);
+
+      return { ...prev, items: updatedItems };
+    });
+  }, [laborFactorSelections, getLaborFactor]);
 
   // Validierung
   const validateStep = (step) => {
@@ -612,8 +718,8 @@ const OfferConfigurator = () => {
         {/* Arbeitszeitfaktoren */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <h4 className="font-medium text-amber-900 mb-3">Arbeitszeitfaktoren</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {['dach', 'elektro', 'geruest', 'fahrt'].map(factorType => {
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {['dach', 'elektro', 'geruest'].map(factorType => {
               const factors = calcSettings.laborFactors?.[factorType] || [];
               return (
                 <div key={factorType}>
@@ -688,38 +794,23 @@ const OfferConfigurator = () => {
                   {selectedServices[category.id] && (
                     <div className="flex items-center space-x-3 mt-2">
                       <span className="text-sm text-gray-600">Menge:</span>
-                      {category.id === 'module' ? (
-                        /* Direktes Eingabefeld für Module */
-                        <input
-                          type="number"
-                          min="1"
-                          value={quantity}
-                          onChange={(e) => {
-                            const newQty = parseInt(e.target.value) || 1;
-                            setServiceQuantities(prev => ({ ...prev, [category.id]: newQty }));
-                          }}
-                          className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-center focus:ring-2 focus:ring-blue-500"
-                        />
-                      ) : (
-                        /* Stepper für andere Kategorien */
-                        <div className="flex items-center border border-gray-300 rounded-lg">
-                          <button
-                            onClick={() => handleQuantityChange(category.id, -1)}
-                            className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-l-lg"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </button>
-                          <span className="px-4 py-1 border-x border-gray-300 min-w-[40px] text-center">
-                            {quantity}
-                          </span>
-                          <button
-                            onClick={() => handleQuantityChange(category.id, 1)}
-                            className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-r-lg"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center border border-gray-300 rounded-lg">
+                        <button
+                          onClick={() => handleQuantityChange(category.id, -1)}
+                          className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-l-lg"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="px-4 py-1 border-x border-gray-300 min-w-[40px] text-center">
+                          {quantity}
+                        </span>
+                        <button
+                          onClick={() => handleQuantityChange(category.id, 1)}
+                          className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded-r-lg"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -795,45 +886,47 @@ const OfferConfigurator = () => {
             </div>
           </div>
 
-          {/* Katalog-Kategorien */}
-          <div className="divide-y divide-gray-100">
-            {SERVICE_CATEGORIES.filter(c => !c.isDropdown).map(category => {
-              const categoryServices = filteredServicesByCategory[category.id] || [];
-              if (categoryServices.length === 0) return null;
+          {/* Katalog-Kategorien - nur anzeigen wenn Suchbegriff eingegeben */}
+          {serviceSearchTerm.trim() && (
+            <div className="divide-y divide-gray-100">
+              {SERVICE_CATEGORIES.map(category => {
+                const categoryServices = filteredServicesByCategory[category.id] || [];
+                if (categoryServices.length === 0) return null;
 
-              return (
-                <div key={category.id}>
-                  <div className="px-4 py-2 bg-gray-50 text-sm font-medium text-gray-600">
-                    {category.label}
-                  </div>
-                  <div className="divide-y divide-gray-50">
-                    {categoryServices.map(service => (
-                      <div
-                        key={service.id}
-                        className="px-4 py-2 flex items-center justify-between hover:bg-gray-50"
-                      >
-                        <div className="flex-1 min-w-0 mr-4">
-                          <p className="text-sm font-medium text-gray-900 truncate">{service.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{service.shortText}</p>
+                return (
+                  <div key={category.id}>
+                    <div className="px-4 py-2 bg-gray-50 text-sm font-medium text-gray-600">
+                      {category.label}
+                    </div>
+                    <div className="divide-y divide-gray-50">
+                      {categoryServices.map(service => (
+                        <div
+                          key={service.id}
+                          className="px-4 py-2 flex items-center justify-between hover:bg-gray-50"
+                        >
+                          <div className="flex-1 min-w-0 mr-4">
+                            <p className="text-sm font-medium text-gray-900 truncate">{service.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{service.shortText}</p>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className="text-xs font-medium text-gray-700">
+                              {formatPrice(service.calculatedPrices?.unitPriceNet)} / {service.unit}
+                            </span>
+                            <button
+                              onClick={() => handleAddService(service)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <span className="text-xs font-medium text-gray-700">
-                            {formatPrice(service.calculatedPrices?.unitPriceNet)} / {service.unit}
-                          </span>
-                          <button
-                            onClick={() => handleAddService(service)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
       </div>
@@ -849,7 +942,7 @@ const OfferConfigurator = () => {
       if (!dateString) return '-';
       try {
         const date = new Date(dateString);
-        return date.toLocaleDateString('de-DE');
+        return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
       } catch {
         return dateString;
       }
@@ -878,26 +971,28 @@ const OfferConfigurator = () => {
             <div className="flex justify-between items-start mb-8 pb-6 border-b">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
-                <p className="text-gray-600 mt-1">{isEditing ? offerId : 'Neu'}</p>
               </div>
               <div className="text-right text-sm text-gray-600">
-                <p className="font-medium text-gray-900">Ihr Unternehmen</p>
-                <p>Musterstraße 123</p>
-                <p>12345 Musterstadt</p>
+                <p className="font-medium text-gray-900">{company.name}</p>
+                <p>{company.street}</p>
+                <p>{company.zipCode} {company.city}</p>
+                <p>Tel: {company.phone}</p>
+                <p>{company.email}</p>
               </div>
             </div>
 
             {/* Kunde & Datum */}
             <div className="grid grid-cols-2 gap-8 mb-8">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Empfänger</p>
                 <div className="text-sm">
-                  <p className="font-medium text-gray-900">
-                    {customer?.firmennameKundenname || customer?.name || '-'}
-                  </p>
-                  {customer?.strasse && <p>{customer.strasse}</p>}
-                  {(customer?.plz || customer?.ort) && (
-                    <p>{customer?.plz} {customer?.ort}</p>
+                  {project?.contactPersonName && (
+                    <p className="font-medium text-gray-900">{project.contactPersonName}</p>
+                  )}
+                  {(project?.street || project?.houseNumber) && (
+                    <p>{project.street} {project.houseNumber}</p>
+                  )}
+                  {(project?.postalCode || project?.city) && (
+                    <p>{project.postalCode} {project.city}</p>
                   )}
                 </div>
               </div>
@@ -911,14 +1006,18 @@ const OfferConfigurator = () => {
                     <span className="text-gray-500">Gültig bis:</span>
                     <span>{formatDateLocal(offerData.conditions?.validUntil)}</span>
                   </div>
-                  {project && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Projekt:</span>
-                      <span>{project.projektname || project.name}</span>
-                    </div>
-                  )}
                 </div>
               </div>
+            </div>
+
+            {/* Betreff & Einleitung */}
+            <div className="mb-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-2">
+                Angebot - {offerData.offerNumber || 'Neu'}
+              </h2>
+              <p className="text-sm text-gray-600">
+                {offerTexts.greeting}
+              </p>
             </div>
 
             {/* Editierbare Positionstabelle */}
@@ -939,7 +1038,7 @@ const OfferConfigurator = () => {
                 <tbody>
                   {offerData.items.map((item, index) => (
                     <tr key={item.id || index} className="border-b border-gray-100 group">
-                      <td className="py-3 text-gray-600">{item.position || index + 1}</td>
+                      <td className="py-3 text-gray-600 align-top">{item.position || index + 1}</td>
                       <td className="py-3">
                         <input
                           type="text"
@@ -947,13 +1046,21 @@ const OfferConfigurator = () => {
                           onChange={(e) => handleUpdateItem(item.id, { shortText: e.target.value })}
                           className="w-full bg-transparent border-0 p-0 focus:ring-0 font-medium text-gray-900"
                         />
+                        {item.longText && (
+                          <p className="text-xs text-gray-500 mt-1">{item.longText}</p>
+                        )}
                         {item.laborFactor > 1 && (
                           <span className="text-xs text-amber-600 block">
                             +{Math.round((item.laborFactor - 1) * 100)}% Arbeitszeit
                           </span>
                         )}
+                        {item.discount > 0 && (
+                          <span className="text-xs text-red-600 block">
+                            {item.discount}% Rabatt gewährt
+                          </span>
+                        )}
                       </td>
-                      <td className="py-3">
+                      <td className="py-3 align-top">
                         <input
                           type="number"
                           min="0"
@@ -963,8 +1070,8 @@ const OfferConfigurator = () => {
                           className="w-full text-right bg-transparent border-0 p-0 focus:ring-0"
                         />
                       </td>
-                      <td className="py-3 text-center text-gray-600">{item.unit}</td>
-                      <td className="py-3">
+                      <td className="py-3 text-center text-gray-600 align-top">{item.unit}</td>
+                      <td className="py-3 align-top">
                         <input
                           type="number"
                           min="0"
@@ -974,7 +1081,7 @@ const OfferConfigurator = () => {
                           className="w-full text-right bg-transparent border-0 p-0 focus:ring-0"
                         />
                       </td>
-                      <td className="py-3">
+                      <td className="py-3 align-top">
                         <div className="flex items-center justify-end">
                           <input
                             type="number"
@@ -987,8 +1094,8 @@ const OfferConfigurator = () => {
                           <span className="text-gray-400 ml-0.5">%</span>
                         </div>
                       </td>
-                      <td className="py-3 text-right font-medium">{formatPrice(item.totalNet)}</td>
-                      <td className="py-3">
+                      <td className="py-3 text-right font-medium align-top">{formatPrice(item.totalNet)}</td>
+                      <td className="py-3 align-top">
                         <button
                           onClick={() => handleRemoveItem(item.id)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity"
@@ -1106,21 +1213,25 @@ const OfferConfigurator = () => {
             <div className="border-t pt-6 text-sm text-gray-600 space-y-3">
               {(offerData.depositPercent > 0) && (
                 <>
-                  <p>
-                    Die Endzahlung erfolgt mit einer Frist von sieben Tagen nach Abschluss aller Montagearbeiten.
-                  </p>
-                  <p>
-                    Wir würden uns sehr freuen, wenn unser Angebot Ihre Zustimmung findet. Sie haben Fragen oder wünschen
-                    weitere Informationen? Rufen Sie uns an – wir sind für Sie da.
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Durch Anzahlung stimmen Sie den Widerrufsbedingungen zu.
-                  </p>
+                  <p>{offerTexts.paymentTerms}</p>
+                  <p>{offerTexts.closing}</p>
+                  <p className="text-xs text-gray-500">{offerTexts.depositNote}</p>
                 </>
               )}
-              <p className="mt-4">Mit freundlichen Grüßen</p>
-              <p className="mt-2 font-medium text-gray-700">Ihr Unternehmen</p>
+              <p className="mt-4">{offerTexts.signature}</p>
+              <p className="mt-2 font-medium text-gray-700">{company.name}</p>
             </div>
+
+            {/* Fußzeile */}
+            {(footer?.column1 || footer?.column2 || footer?.column3) && (
+              <div className="mt-8 pt-4 border-t border-gray-300">
+                <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+                  <div className="whitespace-pre-line">{footer?.column1}</div>
+                  <div className="whitespace-pre-line text-center">{footer?.column2}</div>
+                  <div className="whitespace-pre-line text-right">{footer?.column3}</div>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
@@ -1207,7 +1318,7 @@ const OfferConfigurator = () => {
       if (!dateString) return '-';
       try {
         const date = new Date(dateString);
-        return date.toLocaleDateString('de-DE');
+        return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
       } catch {
         return dateString;
       }
@@ -1222,28 +1333,28 @@ const OfferConfigurator = () => {
             <div className="flex justify-between items-start mb-8 pb-6 border-b">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
-                <p className="text-gray-600 mt-1">{isEditing ? offerId : 'Neu'}</p>
-              </div>
+                              </div>
               <div className="text-right text-sm text-gray-600">
-                <p className="font-medium text-gray-900">Ihr Unternehmen</p>
-                <p>Musterstraße 123</p>
-                <p>12345 Musterstadt</p>
-                <p>Tel: 0123 456789</p>
-                <p>info@unternehmen.de</p>
+                <p className="font-medium text-gray-900">{company.name}</p>
+                <p>{company.street}</p>
+                <p>{company.zipCode} {company.city}</p>
+                <p>Tel: {company.phone}</p>
+                <p>{company.email}</p>
               </div>
             </div>
 
             {/* Kunde & Datum */}
             <div className="grid grid-cols-2 gap-8 mb-8">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Empfänger</p>
                 <div className="text-sm">
-                  <p className="font-medium text-gray-900">
-                    {customer?.firmennameKundenname || customer?.name || '-'}
-                  </p>
-                  {customer?.strasse && <p>{customer.strasse}</p>}
-                  {(customer?.plz || customer?.ort) && (
-                    <p>{customer?.plz} {customer?.ort}</p>
+                  {project?.contactPersonName && (
+                    <p className="font-medium text-gray-900">{project.contactPersonName}</p>
+                  )}
+                  {(project?.street || project?.houseNumber) && (
+                    <p>{project.street} {project.houseNumber}</p>
+                  )}
+                  {(project?.postalCode || project?.city) && (
+                    <p>{project.postalCode} {project.city}</p>
                   )}
                 </div>
               </div>
@@ -1257,27 +1368,17 @@ const OfferConfigurator = () => {
                     <span className="text-gray-500">Gültig bis:</span>
                     <span>{formatDate(offerData.conditions?.validUntil)}</span>
                   </div>
-                  {project && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Projekt:</span>
-                      <span>{project.projektname || project.name}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Betreff */}
+            {/* Betreff & Einleitung */}
             <div className="mb-6">
-              <p className="font-medium text-gray-900">
-                Betreff: Angebot {project ? `- ${project.projektname || project.name}` : ''}
-              </p>
-            </div>
-
-            {/* Einleitung */}
-            <div className="mb-6 text-sm text-gray-600">
-              <p>
-                Vielen Dank für Ihre Anfrage. Wir freuen uns, Ihnen folgendes Angebot unterbreiten zu dürfen:
+              <h2 className="text-base font-semibold text-gray-900 mb-2">
+                Angebot - {offerData.offerNumber || 'Neu'}
+              </h2>
+              <p className="text-sm text-gray-600">
+                {offerTexts.greeting}
               </p>
             </div>
 
@@ -1303,10 +1404,24 @@ const OfferConfigurator = () => {
                         {item.longText && (
                           <p className="text-xs text-gray-500 mt-1">{item.longText}</p>
                         )}
+                        {item.discount > 0 && (
+                          <p className="text-xs text-red-600 mt-1">
+                            {item.discount}% Rabatt
+                          </p>
+                        )}
                       </td>
                       <td className="py-3 text-right">{item.quantity}</td>
                       <td className="py-3 text-center text-gray-600">{item.unit}</td>
-                      <td className="py-3 text-right">{formatPrice(item.unitPriceNet)}</td>
+                      <td className="py-3 text-right">
+                        {item.discount > 0 ? (
+                          <div>
+                            <span className="line-through text-gray-400 text-xs">{formatPrice(item.unitPriceNet)}</span>
+                            <span className="block text-red-600">{formatPrice(item.unitPriceNet * (1 - item.discount / 100))}</span>
+                          </div>
+                        ) : (
+                          formatPrice(item.unitPriceNet)
+                        )}
+                      </td>
                       <td className="py-3 text-right font-medium">{formatPrice(item.totalNet)}</td>
                     </tr>
                   ))}
@@ -1363,23 +1478,58 @@ const OfferConfigurator = () => {
             <div className="border-t pt-6 text-sm text-gray-600 space-y-3">
               {(offerData.depositPercent > 0) && (
                 <>
-                  <p>
-                    Die Endzahlung erfolgt mit einer Frist von sieben Tagen nach Abschluss aller Montagearbeiten.
-                  </p>
-                  <p>
-                    Wir würden uns sehr freuen, wenn unser Angebot Ihre Zustimmung findet. Sie haben Fragen oder wünschen
-                    weitere Informationen? Rufen Sie uns an – wir sind für Sie da.
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Durch Anzahlung stimmen Sie den Widerrufsbedingungen zu.
-                  </p>
+                  <p>{offerTexts.paymentTerms}</p>
+                  <p>{offerTexts.closing}</p>
+                  <p className="text-xs text-gray-500">{offerTexts.depositNote}</p>
                 </>
               )}
-              <p className="mt-4">Mit freundlichen Grüßen</p>
-              <p className="mt-2 font-medium text-gray-700">Ihr Unternehmen</p>
+              <p className="mt-4">{offerTexts.signature}</p>
+              <p className="mt-2 font-medium text-gray-700">{company.name}</p>
             </div>
+
+            {/* Fußzeile */}
+            {(footer?.column1 || footer?.column2 || footer?.column3) && (
+              <div className="mt-8 pt-4 border-t border-gray-300">
+                <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+                  <div className="whitespace-pre-line">{footer?.column1}</div>
+                  <div className="whitespace-pre-line text-center">{footer?.column2}</div>
+                  <div className="whitespace-pre-line text-right">{footer?.column3}</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Zusätzliche Seiten */}
+        {additionalPages && additionalPages.length > 0 && additionalPages.map((page, index) => (
+          <div key={page.id || index} className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden mt-6">
+            <div className="p-8 min-h-[297mm] flex flex-col relative">
+              {/* Seiteninhalt */}
+              <div className="flex-1">
+                {/* Seitentitel */}
+                {page.title && (
+                  <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b">{page.title}</h2>
+                )}
+
+                {/* Seiteninhalt */}
+                <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+                  {page.content}
+                </div>
+              </div>
+
+              {/* Fußzeile auf zusätzlichen Seiten - immer unten */}
+              {(footer?.column1 || footer?.column2 || footer?.column3) && (
+                <div className="mt-auto pt-4 border-t border-gray-300">
+                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
+                    <div className="whitespace-pre-line">{footer?.column1}</div>
+                    <div className="whitespace-pre-line text-center">{footer?.column2}</div>
+                    <div className="whitespace-pre-line text-right">{footer?.column3}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     );
   };

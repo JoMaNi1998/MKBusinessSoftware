@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Save,
@@ -7,11 +7,7 @@ import {
   Package,
   Clock,
   Calculator,
-  Search,
-  ChevronDown,
-  AlertCircle,
-  Layers,
-  RefreshCcw
+  Search
 } from 'lucide-react';
 import { useServiceCatalog, SERVICE_CATEGORIES, SERVICE_UNITS } from '../../context/ServiceCatalogContext';
 import { useCalculation } from '../../context/CalculationContext';
@@ -20,7 +16,7 @@ import { useNotification } from '../../context/NotificationContext';
 import BaseModal from '../BaseModal';
 
 const ServicePositionEditor = ({ service, isOpen, onClose }) => {
-  const { addService, updateService, services: allServices, activeServices } = useServiceCatalog();
+  const { addService, updateService } = useServiceCatalog();
   const { settings: calcSettings, calculateServicePosition } = useCalculation();
   const { materials } = useMaterials();
   const { showNotification } = useNotification();
@@ -36,25 +32,23 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
     unit: 'Stk',
     materials: [],
     labor: [],
-    isActive: true,
     isDefaultPosition: false,
     defaultQuantity: 1,
     sortOrder: 999,
-    // Paket-Struktur
-    isPackage: false,
-    subItems: [],  // [{serviceId: string, quantity: number}]
-    // Ersetzungs-Logik
-    replaces: []  // Array von Service-IDs die ersetzt werden
+    // Materialaufschlag in %
+    materialMarkup: 15
   });
 
   const [materialSearch, setMaterialSearch] = useState('');
   const [showMaterialDropdown, setShowMaterialDropdown] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
-  const [subItemSearch, setSubItemSearch] = useState('');
-  const [showSubItemDropdown, setShowSubItemDropdown] = useState(false);
-  const [replacesSearch, setReplacesSearch] = useState('');
-  const [showReplacesDropdown, setShowReplacesDropdown] = useState(false);
+
+  // Refs für Click-Outside-Handler
+  const materialDropdownRef = useRef(null);
+
+  // Standard-Materialaufschlag aus Einstellungen
+  const defaultMarkup = calcSettings.margins?.defaultMaterialMarkup ?? 15;
 
   // Formular mit Service-Daten befüllen
   useEffect(() => {
@@ -67,13 +61,10 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
         unit: service.unit || 'Stk',
         materials: service.materials || [],
         labor: service.labor || [],
-        isActive: service.isActive !== false,
         isDefaultPosition: service.isDefaultPosition || false,
         defaultQuantity: service.defaultQuantity || 1,
         sortOrder: service.sortOrder || 999,
-        isPackage: service.isPackage || false,
-        subItems: service.subItems || [],
-        replaces: service.replaces || []
+        materialMarkup: service.materialMarkup ?? defaultMarkup
       });
     } else {
       setFormData({
@@ -84,21 +75,30 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
         unit: 'Stk',
         materials: [],
         labor: [],
-        isActive: true,
         isDefaultPosition: false,
         defaultQuantity: 1,
         sortOrder: 999,
-        isPackage: false,
-        subItems: [],
-        replaces: []
+        materialMarkup: defaultMarkup
       });
     }
     setErrors({});
-    setSubItemSearch('');
-    setShowSubItemDropdown(false);
-    setReplacesSearch('');
-    setShowReplacesDropdown(false);
-  }, [service, isOpen]);
+    setMaterialSearch('');
+    setShowMaterialDropdown(false);
+  }, [service, isOpen, defaultMarkup]);
+
+  // Click-Outside-Handler für Dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (materialDropdownRef.current && !materialDropdownRef.current.contains(event.target)) {
+        setShowMaterialDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Gefilterte Materialien für Dropdown
   const filteredMaterials = useMemo(() => {
@@ -114,56 +114,10 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
       .slice(0, 20);
   }, [materials, materialSearch]);
 
-  // Gefilterte Services für SubItems Dropdown (nicht sich selbst, nicht bereits hinzugefügt)
-  const filteredSubItemServices = useMemo(() => {
-    const existingIds = formData.subItems.map(s => s.serviceId);
-    const currentId = service?.id;
-
-    let filtered = activeServices.filter(s =>
-      s.id !== currentId && !existingIds.includes(s.id)
-    );
-
-    if (subItemSearch.trim()) {
-      const term = subItemSearch.toLowerCase();
-      filtered = filtered.filter(s =>
-        s.name?.toLowerCase().includes(term) ||
-        s.shortText?.toLowerCase().includes(term)
-      );
-    }
-
-    return filtered.slice(0, 20);
-  }, [activeServices, subItemSearch, formData.subItems, service?.id]);
-
-  // Gefilterte Services für Replaces Dropdown (nicht sich selbst, nicht bereits hinzugefügt)
-  const filteredReplacesServices = useMemo(() => {
-    const existingIds = formData.replaces;
-    const currentId = service?.id;
-
-    let filtered = activeServices.filter(s =>
-      s.id !== currentId && !existingIds.includes(s.id)
-    );
-
-    if (replacesSearch.trim()) {
-      const term = replacesSearch.toLowerCase();
-      filtered = filtered.filter(s =>
-        s.name?.toLowerCase().includes(term) ||
-        s.shortText?.toLowerCase().includes(term)
-      );
-    }
-
-    return filtered.slice(0, 20);
-  }, [activeServices, replacesSearch, formData.replaces, service?.id]);
-
-  // Service-Name anhand ID finden
-  const getServiceName = (serviceId) => {
-    const svc = allServices.find(s => s.id === serviceId);
-    return svc?.name || serviceId;
-  };
-
   // Kalkulation berechnen
   const calculatedPrices = useMemo(() => {
-    return calculateServicePosition(formData.materials, formData.labor, materials);
-  }, [formData.materials, formData.labor, materials, calculateServicePosition]);
+    return calculateServicePosition(formData.materials, formData.labor, materials, formData.materialMarkup);
+  }, [formData.materials, formData.labor, materials, formData.materialMarkup, calculateServicePosition]);
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -211,10 +165,14 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
 
   // Arbeitszeit hinzufügen
   const handleAddLabor = () => {
+    // Ersten verfügbaren Stundensatz als Standard verwenden
+    const availableRoles = Object.keys(calcSettings.hourlyRates || {});
+    const defaultRole = availableRoles[0] || 'gesellePrivat';
+
     handleChange('labor', [
       ...formData.labor,
       {
-        role: 'geselle',
+        role: defaultRole,
         description: 'Arbeitszeit',
         minutes: 30
       }
@@ -231,43 +189,6 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
   // Arbeitszeit entfernen
   const handleRemoveLabor = (index) => {
     handleChange('labor', formData.labor.filter((_, i) => i !== index));
-  };
-
-  // SubItem (Unterleistung) hinzufügen
-  const handleAddSubItem = (selectedService) => {
-    handleChange('subItems', [
-      ...formData.subItems,
-      {
-        serviceId: selectedService.id,
-        quantity: 1
-      }
-    ]);
-    setSubItemSearch('');
-    setShowSubItemDropdown(false);
-  };
-
-  // SubItem Menge ändern
-  const handleSubItemQuantityChange = (index, quantity) => {
-    const updated = [...formData.subItems];
-    updated[index].quantity = parseInt(quantity) || 1;
-    handleChange('subItems', updated);
-  };
-
-  // SubItem entfernen
-  const handleRemoveSubItem = (index) => {
-    handleChange('subItems', formData.subItems.filter((_, i) => i !== index));
-  };
-
-  // Replaces Service hinzufügen
-  const handleAddReplaces = (selectedService) => {
-    handleChange('replaces', [...formData.replaces, selectedService.id]);
-    setReplacesSearch('');
-    setShowReplacesDropdown(false);
-  };
-
-  // Replaces Service entfernen
-  const handleRemoveReplaces = (serviceId) => {
-    handleChange('replaces', formData.replaces.filter(id => id !== serviceId));
   };
 
   // Validierung
@@ -336,7 +257,7 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
         <div className="space-y-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name <span className="text-red-500">*</span>
+              Interner Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -347,6 +268,7 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
                 errors.name ? 'border-red-300' : 'border-gray-300'
               }`}
             />
+            <p className="text-xs text-gray-500 mt-1">Nur zur internen Verwaltung, wird nicht im Angebot angezeigt</p>
             {errors.name && (
               <p className="text-red-500 text-xs mt-1">{errors.name}</p>
             )}
@@ -354,17 +276,18 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Kurztext <span className="text-red-500">*</span>
+              Positionstext im Angebot <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.shortText}
               onChange={(e) => handleChange('shortText', e.target.value)}
-              placeholder="Erscheint im Angebot"
+              placeholder="z.B. Montage PV-Modul inkl. Befestigung"
               className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 ${
                 errors.shortText ? 'border-red-300' : 'border-gray-300'
               }`}
             />
+            <p className="text-xs text-gray-500 mt-1">Dieser Text erscheint als Positionsbeschreibung im Angebot für den Kunden</p>
             {errors.shortText && (
               <p className="text-red-500 text-xs mt-1">{errors.shortText}</p>
             )}
@@ -372,15 +295,16 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Langtext (optional)
+              Detailbeschreibung (optional)
             </label>
             <textarea
               value={formData.longText}
               onChange={(e) => handleChange('longText', e.target.value)}
-              placeholder="Detaillierte Beschreibung der Leistung..."
+              placeholder="Ausführliche Beschreibung für das Angebot..."
               rows={3}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
             />
+            <p className="text-xs text-gray-500 mt-1">Optionale Zusatzinformationen, die unter der Position im Angebot angezeigt werden</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -426,7 +350,7 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
           </div>
 
           {/* Material-Suche */}
-          <div className="relative mb-4">
+          <div className="relative mb-4" ref={materialDropdownRef}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
@@ -521,8 +445,22 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
                     <td></td>
                   </tr>
                   <tr>
-                    <td colSpan="3" className="px-3 py-2 text-right font-medium text-blue-600">
-                      + Aufschlag ({calcSettings.margins?.materialMarkup}%):
+                    <td colSpan="2" className="px-3 py-2 text-right font-medium text-blue-600">
+                      + Aufschlag
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-end">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={formData.materialMarkup}
+                          onChange={(e) => handleChange('materialMarkup', parseFloat(e.target.value) || 0)}
+                          className="w-16 text-right border border-gray-200 rounded px-2 py-1"
+                        />
+                        <span className="ml-1 text-gray-500">%</span>
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-right font-bold text-blue-600">
                       {formatPrice(calculatedPrices.materialCostVK)}
@@ -652,18 +590,6 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
               <span className="text-gray-600">Lohnkosten:</span>
               <span>{formatPrice(calculatedPrices.laborCost)}</span>
             </div>
-            <div className="flex justify-between text-sm border-t pt-2">
-              <span className="text-gray-600">Selbstkosten:</span>
-              <span>{formatPrice(calculatedPrices.subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">+ Gewinn ({calcSettings.margins?.profitMargin}%):</span>
-              <span>{formatPrice(calculatedPrices.subtotal * (calcSettings.margins?.profitMargin || 0) / 100)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">+ Wagnis ({calcSettings.margins?.riskMargin}%):</span>
-              <span>{formatPrice(calculatedPrices.subtotal * (calcSettings.margins?.riskMargin || 0) / 100)}</span>
-            </div>
             <div className="flex justify-between text-base font-bold border-t pt-2 text-blue-600">
               <span>Einheitspreis (netto):</span>
               <span>{formatPrice(calculatedPrices.unitPriceNet)} / {formData.unit}</span>
@@ -671,25 +597,8 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* Aktiv-Schalter */}
-        <div className="flex items-center justify-between border-t pt-6">
-          <div>
-            <span className="font-medium text-gray-900">Position aktiv</span>
-            <p className="text-sm text-gray-500">Nur aktive Positionen erscheinen in der Auswahl</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.isActive}
-              onChange={(e) => handleChange('isActive', e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          </label>
-        </div>
-
         {/* Pflichtposition-Schalter */}
-        <div className="flex items-center justify-between border-t pt-6 mt-6">
+        <div className="flex items-center justify-between border-t pt-6">
           <div>
             <span className="font-medium text-gray-900">Standardmäßig zu Angeboten hinzufügen</span>
             <p className="text-sm text-gray-500">Position wird automatisch zu jedem neuen Angebot hinzugefügt</p>
@@ -722,163 +631,6 @@ const ServicePositionEditor = ({ service, isOpen, onClose }) => {
           </div>
         )}
 
-        {/* Paket-Schalter */}
-        <div className="flex items-center justify-between border-t pt-6 mt-6">
-          <div>
-            <span className="font-medium text-gray-900">Ist ein Paket</span>
-            <p className="text-sm text-gray-500">Dieses Paket enthält mehrere Unterleistungen</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.isPackage}
-              onChange={(e) => handleChange('isPackage', e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-          </label>
-        </div>
-
-        {/* Unterleistungen (nur wenn isPackage = true) */}
-        {formData.isPackage && (
-          <div className="mt-4 pl-4 border-l-2 border-purple-200">
-            <div className="flex items-center space-x-2 mb-3">
-              <Layers className="h-4 w-4 text-purple-600" />
-              <span className="font-medium text-gray-700 text-sm">Enthaltene Unterleistungen</span>
-            </div>
-
-            {/* Unterleistung suchen & hinzufügen */}
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                value={subItemSearch}
-                onChange={(e) => {
-                  setSubItemSearch(e.target.value);
-                  setShowSubItemDropdown(true);
-                }}
-                onFocus={() => setShowSubItemDropdown(true)}
-                placeholder="Unterleistung suchen und hinzufügen..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
-              />
-
-              {showSubItemDropdown && filteredSubItemServices.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {filteredSubItemServices.map(svc => (
-                    <button
-                      key={svc.id}
-                      onClick={() => handleAddSubItem(svc)}
-                      className="w-full px-4 py-2 text-left hover:bg-purple-50 flex items-center justify-between text-sm"
-                    >
-                      <span className="truncate">{svc.name}</span>
-                      <span className="text-xs text-gray-500 ml-2">
-                        {SERVICE_CATEGORIES.find(c => c.id === svc.category)?.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Liste der hinzugefügten Unterleistungen */}
-            {formData.subItems.length === 0 ? (
-              <div className="text-center py-3 text-gray-500 text-sm bg-gray-50 rounded-lg">
-                Noch keine Unterleistungen hinzugefügt
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {formData.subItems.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between bg-purple-50 px-3 py-2 rounded-lg">
-                    <span className="text-sm text-gray-900 truncate flex-1">{getServiceName(item.serviceId)}</span>
-                    <div className="flex items-center space-x-2 ml-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleSubItemQuantityChange(index, e.target.value)}
-                        className="w-16 text-center text-sm border border-gray-200 rounded px-2 py-1"
-                      />
-                      <button
-                        onClick={() => handleRemoveSubItem(index)}
-                        className="p-1 text-gray-400 hover:text-red-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Ersetzungs-Logik */}
-        <div className="border-t pt-6 mt-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <RefreshCcw className="h-5 w-5 text-orange-600" />
-            <h3 className="font-medium text-gray-900">Ersetzungs-Logik</h3>
-          </div>
-          <p className="text-sm text-gray-500 mb-4">
-            Diese Leistung ersetzt automatisch die folgenden anderen Leistungen (z.B. Emma ersetzt Smartmeter)
-          </p>
-
-          {/* Ersetzt-Leistung suchen & hinzufügen */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={replacesSearch}
-              onChange={(e) => {
-                setReplacesSearch(e.target.value);
-                setShowReplacesDropdown(true);
-              }}
-              onFocus={() => setShowReplacesDropdown(true)}
-              placeholder="Leistung suchen die ersetzt werden soll..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-sm"
-            />
-
-            {showReplacesDropdown && filteredReplacesServices.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {filteredReplacesServices.map(svc => (
-                  <button
-                    key={svc.id}
-                    onClick={() => handleAddReplaces(svc)}
-                    className="w-full px-4 py-2 text-left hover:bg-orange-50 flex items-center justify-between text-sm"
-                  >
-                    <span className="truncate">{svc.name}</span>
-                    <span className="text-xs text-gray-500 ml-2">
-                      {SERVICE_CATEGORIES.find(c => c.id === svc.category)?.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Liste der ersetzten Leistungen (als Tags) */}
-          {formData.replaces.length === 0 ? (
-            <div className="text-center py-3 text-gray-500 text-sm bg-gray-50 rounded-lg">
-              Ersetzt keine anderen Leistungen
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {formData.replaces.map((serviceId) => (
-                <span
-                  key={serviceId}
-                  className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm"
-                >
-                  {getServiceName(serviceId)}
-                  <button
-                    onClick={() => handleRemoveReplaces(serviceId)}
-                    className="ml-2 text-orange-600 hover:text-orange-800"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Footer */}

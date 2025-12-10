@@ -17,7 +17,13 @@ import {
   AlertCircle,
   Loader,
   Calculator,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Building2,
+  Phone,
+  MapPin,
+  Globe,
+  CreditCard,
+  FileText
 } from 'lucide-react';
 import { FirebaseService } from '../services/firebaseService';
 import { useNotification } from '../context/NotificationContext';
@@ -30,13 +36,18 @@ import BaseModal from './BaseModal';
 import BasePage from './BasePage';
 import CalculationSettings from './offers/CalculationSettings';
 import ServiceCatalog from './offers/ServiceCatalog';
+import { useCompany } from '../context/CompanyContext';
+import { useCalculation } from '../context/CalculationContext';
 
 const Settings = () => {
   const { showNotification } = useNotification();
   const { materials } = useMaterials();
   const { user } = useAuth();
   const { isAdmin } = useRole();
+  const { settings: companySettings, saveSettings: saveCompanySettings, saving: savingCompany } = useCompany();
+  const { saving: calculationSaving } = useCalculation();
   const [activeTab, setActiveTab] = useState('users');
+  const [companyData, setCompanyData] = useState(null);
   const [pvSubTab, setPvSubTab] = useState('komponenten');
   const [settings, setSettings] = useState({});
   
@@ -500,6 +511,7 @@ const Settings = () => {
   };
 
   const tabs = [
+    { id: 'company', name: 'Firmendaten & Texte', icon: Building2 },
     { id: 'users', name: 'Benutzerverwaltung', icon: Users },
     { id: 'pv-configurator', name: 'PV Konfigurator', icon: Zap },
     { id: 'kalkulation', name: 'Kalkulation', icon: Calculator },
@@ -517,9 +529,11 @@ const Settings = () => {
             Verwalten Sie Ihre Anwendungseinstellungen und Präferenzen
           </p>
         </div>
-        {activeTab === 'pv-configurator' && (
+        {(activeTab === 'pv-configurator' || activeTab === 'company' || activeTab === 'kalkulation') && (
           <div className="flex items-center space-x-2 text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
-            {pvDefaultsSaving ? (
+            {(activeTab === 'pv-configurator' && pvDefaultsSaving) ||
+             (activeTab === 'company' && savingCompany) ||
+             (activeTab === 'kalkulation' && calculationSaving) ? (
               <>
                 <Loader className="h-4 w-4 animate-spin text-primary-600" />
                 <span>Speichert...</span>
@@ -560,6 +574,500 @@ const Settings = () => {
 
         {/* Tab Content */}
         <div className="p-6">
+          {activeTab === 'company' && (
+            <div className="space-y-8">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Firmendaten & Texte</h3>
+                  <p className="text-sm text-gray-600">
+                    Konfigurieren Sie Ihre Firmendaten und Texte für Angebote und Rechnungen
+                  </p>
+                </div>
+                {savingCompany && (
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Loader className="animate-spin h-4 w-4 mr-2" />
+                    Speichert...
+                  </div>
+                )}
+              </div>
+
+              {/* Firmendaten */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h4 className="text-md font-medium text-gray-900 mb-4 flex items-center">
+                  <Building2 className="h-5 w-5 mr-2 text-gray-500" />
+                  Firmendaten
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Firmenname</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.name ?? companySettings.company?.name ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, name: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                    <input
+                      type="email"
+                      value={companyData?.company?.email ?? companySettings.company?.email ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, email: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Straße</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.street ?? companySettings.company?.street ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, street: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.phone ?? companySettings.company?.phone ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, phone: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">PLZ</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.zipCode ?? companySettings.company?.zipCode ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, zipCode: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ort</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.city ?? companySettings.company?.city ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, city: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.website ?? companySettings.company?.website ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, website: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Steuernummer / USt-IdNr.</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.taxId ?? companySettings.company?.taxId ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, taxId: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Bankdaten */}
+                <h5 className="text-sm font-medium text-gray-900 mt-6 mb-3 flex items-center">
+                  <CreditCard className="h-4 w-4 mr-2 text-gray-500" />
+                  Bankverbindung
+                </h5>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bank</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.bankName ?? companySettings.company?.bankName ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, bankName: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">IBAN</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.iban ?? companySettings.company?.iban ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, iban: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">BIC</label>
+                    <input
+                      type="text"
+                      value={companyData?.company?.bic ?? companySettings.company?.bic ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        company: { ...companySettings.company, ...prev?.company, bic: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Angebots-Texte */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h4 className="text-md font-medium text-gray-900 mb-4 flex items-center">
+                  <FileText className="h-5 w-5 mr-2 text-gray-500" />
+                  Angebots-Texte
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Einleitungstext</label>
+                    <textarea
+                      value={companyData?.offerTexts?.greeting ?? companySettings.offerTexts?.greeting ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        offerTexts: { ...companySettings.offerTexts, ...prev?.offerTexts, greeting: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Zahlungsbedingungen</label>
+                    <textarea
+                      value={companyData?.offerTexts?.paymentTerms ?? companySettings.offerTexts?.paymentTerms ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        offerTexts: { ...companySettings.offerTexts, ...prev?.offerTexts, paymentTerms: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Abschlusstext</label>
+                    <textarea
+                      value={companyData?.offerTexts?.closing ?? companySettings.offerTexts?.closing ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        offerTexts: { ...companySettings.offerTexts, ...prev?.offerTexts, closing: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Anzahlungs-Hinweis</label>
+                    <textarea
+                      value={companyData?.offerTexts?.depositNote ?? companySettings.offerTexts?.depositNote ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        offerTexts: { ...companySettings.offerTexts, ...prev?.offerTexts, depositNote: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={1}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Grußformel</label>
+                    <input
+                      type="text"
+                      value={companyData?.offerTexts?.signature ?? companySettings.offerTexts?.signature ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        offerTexts: { ...companySettings.offerTexts, ...prev?.offerTexts, signature: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rechnungs-Texte */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h4 className="text-md font-medium text-gray-900 mb-4 flex items-center">
+                  <FileText className="h-5 w-5 mr-2 text-gray-500" />
+                  Rechnungs-Texte
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Einleitungstext</label>
+                    <textarea
+                      value={companyData?.invoiceTexts?.greeting ?? companySettings.invoiceTexts?.greeting ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        invoiceTexts: { ...companySettings.invoiceTexts, ...prev?.invoiceTexts, greeting: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Zahlungsbedingungen</label>
+                    <textarea
+                      value={companyData?.invoiceTexts?.paymentTerms ?? companySettings.invoiceTexts?.paymentTerms ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        invoiceTexts: { ...companySettings.invoiceTexts, ...prev?.invoiceTexts, paymentTerms: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Abschlusstext</label>
+                    <textarea
+                      value={companyData?.invoiceTexts?.closing ?? companySettings.invoiceTexts?.closing ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        invoiceTexts: { ...companySettings.invoiceTexts, ...prev?.invoiceTexts, closing: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={2}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Grußformel</label>
+                    <input
+                      type="text"
+                      value={companyData?.invoiceTexts?.signature ?? companySettings.invoiceTexts?.signature ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        invoiceTexts: { ...companySettings.invoiceTexts, ...prev?.invoiceTexts, signature: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Fußzeile (3 Spalten) */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h4 className="text-md font-medium text-gray-900 mb-4 flex items-center">
+                  <FileText className="h-5 w-5 mr-2 text-gray-500" />
+                  Fußzeile (wird auf jeder Seite angezeigt)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Spalte 1 (Links)</label>
+                    <textarea
+                      value={companyData?.footer?.column1 ?? companySettings.footer?.column1 ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        footer: { ...companySettings.footer, ...prev?.footer, column1: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="z.B. Firmenname&#10;Inhaber&#10;Adresse"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Spalte 2 (Mitte)</label>
+                    <textarea
+                      value={companyData?.footer?.column2 ?? companySettings.footer?.column2 ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        footer: { ...companySettings.footer, ...prev?.footer, column2: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="z.B. Bank&#10;IBAN&#10;BIC"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Spalte 3 (Rechts)</label>
+                    <textarea
+                      value={companyData?.footer?.column3 ?? companySettings.footer?.column3 ?? ''}
+                      onChange={(e) => setCompanyData(prev => ({
+                        ...companySettings,
+                        ...prev,
+                        footer: { ...companySettings.footer, ...prev?.footer, column3: e.target.value }
+                      }))}
+                      onBlur={() => companyData && saveCompanySettings(companyData)}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="z.B. USt-IdNr.&#10;Finanzamt&#10;Kontakt"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Zusätzliche Seiten */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-md font-medium text-gray-900 flex items-center">
+                    <FileText className="h-5 w-5 mr-2 text-gray-500" />
+                    Zusätzliche Seiten (Widerrufsrecht, Garantien, etc.)
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newPage = {
+                        id: `page-${Date.now()}`,
+                        title: 'Neue Seite',
+                        content: ''
+                      };
+                      const updatedPages = [...(companySettings.additionalPages || []), newPage];
+                      const updatedData = {
+                        ...companySettings,
+                        ...companyData,
+                        additionalPages: updatedPages
+                      };
+                      setCompanyData(updatedData);
+                      saveCompanySettings(updatedData);
+                    }}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Seite hinzufügen
+                  </button>
+                </div>
+
+                {(companyData?.additionalPages || companySettings.additionalPages || []).length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-500">Keine zusätzlichen Seiten konfiguriert</p>
+                    <p className="text-xs text-gray-400 mt-1">Fügen Sie Seiten wie Widerrufsrecht, Garantien oder AGB hinzu</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {(companyData?.additionalPages || companySettings.additionalPages || []).map((page, index) => (
+                      <div key={page.id} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1 mr-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Seitentitel</label>
+                            <input
+                              type="text"
+                              value={page.title}
+                              onChange={(e) => {
+                                const updatedPages = [...(companyData?.additionalPages || companySettings.additionalPages || [])];
+                                updatedPages[index] = { ...page, title: e.target.value };
+                                setCompanyData(prev => ({
+                                  ...companySettings,
+                                  ...prev,
+                                  additionalPages: updatedPages
+                                }));
+                              }}
+                              onBlur={() => companyData && saveCompanySettings(companyData)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedPages = (companyData?.additionalPages || companySettings.additionalPages || []).filter(p => p.id !== page.id);
+                              const updatedData = {
+                                ...companySettings,
+                                ...companyData,
+                                additionalPages: updatedPages
+                              };
+                              setCompanyData(updatedData);
+                              saveCompanySettings(updatedData);
+                            }}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Seiteninhalt</label>
+                          <textarea
+                            value={page.content}
+                            onChange={(e) => {
+                              const updatedPages = [...(companyData?.additionalPages || companySettings.additionalPages || [])];
+                              updatedPages[index] = { ...page, content: e.target.value };
+                              setCompanyData(prev => ({
+                                ...companySettings,
+                                ...prev,
+                                additionalPages: updatedPages
+                              }));
+                            }}
+                            onBlur={() => companyData && saveCompanySettings(companyData)}
+                            rows={8}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                            placeholder="Seiteninhalt eingeben..."
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'users' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">

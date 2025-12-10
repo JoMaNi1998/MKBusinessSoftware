@@ -21,6 +21,7 @@ import { useCalculation } from '../../context/CalculationContext';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
 import { useNotification } from '../../context/NotificationContext';
+import { useCompany } from '../../context/CompanyContext';
 
 // Wizard Steps
 const STEPS = [
@@ -45,6 +46,7 @@ const InvoiceConfigurator = () => {
   const { customers } = useCustomers();
   const { projects } = useProjects();
   const { showNotification } = useNotification();
+  const { company, invoiceTexts } = useCompany();
 
   // State
   const [currentStep, setCurrentStep] = useState(0);
@@ -272,7 +274,7 @@ const InvoiceConfigurator = () => {
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
-      return new Date(dateString).toLocaleDateString('de-DE');
+      return new Date(dateString).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
     } catch {
       return dateString;
     }
@@ -401,9 +403,9 @@ const InvoiceConfigurator = () => {
                 )}
               </div>
               <div className="text-right text-sm text-gray-600">
-                <p className="font-medium text-gray-900">Ihr Unternehmen</p>
-                <p>Musterstraße 123</p>
-                <p>12345 Musterstadt</p>
+                <p className="font-medium text-gray-900">{company.name}</p>
+                <p>{company.street}</p>
+                <p>{company.zipCode} {company.city}</p>
               </div>
             </div>
 
@@ -559,10 +561,11 @@ const InvoiceConfigurator = () => {
             {/* Footer */}
             <div className="border-t pt-6 text-sm text-gray-500">
               <p>
-                Bitte überweisen Sie den Betrag bis zum {formatDate(invoiceData.dueDate)}.
+                {invoiceTexts.paymentTerms}
               </p>
-              <p className="mt-4">Vielen Dank für Ihr Vertrauen!</p>
-              <p className="mt-4 font-medium text-gray-700">Ihr Unternehmen</p>
+              <p className="mt-4">{invoiceTexts.closing}</p>
+              <p className="mt-4">{invoiceTexts.signature}</p>
+              <p className="mt-2 font-medium text-gray-700">{company.name}</p>
             </div>
 
           </div>
@@ -590,11 +593,11 @@ const InvoiceConfigurator = () => {
                 )}
               </div>
               <div className="text-right text-sm text-gray-600">
-                <p className="font-medium text-gray-900">Ihr Unternehmen</p>
-                <p>Musterstraße 123</p>
-                <p>12345 Musterstadt</p>
-                <p>Tel: 0123 456789</p>
-                <p>info@unternehmen.de</p>
+                <p className="font-medium text-gray-900">{company.name}</p>
+                <p>{company.street}</p>
+                <p>{company.zipCode} {company.city}</p>
+                <p>Tel: {company.phone}</p>
+                <p>{company.email}</p>
               </div>
             </div>
 
@@ -687,23 +690,26 @@ const InvoiceConfigurator = () => {
             </div>
 
             {/* Zahlungsinformationen */}
-            <div className="border-t pt-6 mb-6 text-sm">
-              <h3 className="font-medium text-gray-900 mb-3">Zahlungsinformationen</h3>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-gray-500 mb-1">Bankverbindung:</p>
-                <p>IBAN: DE89 3704 0044 0532 0130 00</p>
-                <p>BIC: COBADEFFXXX</p>
+            {(company.iban || company.bic) && (
+              <div className="border-t pt-6 mb-6 text-sm">
+                <h3 className="font-medium text-gray-900 mb-3">Zahlungsinformationen</h3>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500 mb-1">Bankverbindung:</p>
+                  {company.bankName && <p>{company.bankName}</p>}
+                  {company.iban && <p>IBAN: {company.iban}</p>}
+                  {company.bic && <p>BIC: {company.bic}</p>}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Footer */}
             <div className="border-t pt-6 text-sm text-gray-500">
               <p>
-                Bitte überweisen Sie den Betrag von <strong>{formatPrice(invoiceData.totals?.grossTotal)}</strong> bis
-                zum <strong>{formatDate(invoiceData.dueDate)}</strong>.
+                {invoiceTexts.paymentTerms}
               </p>
-              <p className="mt-4">Vielen Dank für Ihr Vertrauen!</p>
-              <p className="mt-4 font-medium text-gray-700">Ihr Unternehmen</p>
+              <p className="mt-4">{invoiceTexts.closing}</p>
+              <p className="mt-4">{invoiceTexts.signature}</p>
+              <p className="mt-2 font-medium text-gray-700">{company.name}</p>
             </div>
           </div>
         </div>

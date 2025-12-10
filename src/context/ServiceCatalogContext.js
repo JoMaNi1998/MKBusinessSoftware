@@ -14,23 +14,18 @@ export const useServiceCatalog = () => {
 };
 
 // Kategorien für Leistungspositionen
-// isDropdown: true = erscheint als Dropdown im OfferConfigurator
-// isDropdown: false = erscheint nur im Leistungskatalog (für manuelle Auswahl)
 export const SERVICE_CATEGORIES = [
-  // Dropdown-Kategorien (Hauptkomponenten im OfferConfigurator)
-  { id: 'module', label: 'PV-Module', icon: 'Sun', isDropdown: true },
+  { id: 'pv-montage', label: 'PV-Montage', icon: 'Sun', isDropdown: true },
   { id: 'wechselrichter', label: 'Wechselrichter', icon: 'Zap', isDropdown: true },
   { id: 'speicher', label: 'Speicher', icon: 'Battery', isDropdown: true },
   { id: 'wallbox', label: 'Wallbox', icon: 'Car', isDropdown: true },
   { id: 'notstrom', label: 'Notstrom', icon: 'Power', isDropdown: true },
   { id: 'optimierer', label: 'Optimierer', icon: 'Target', isDropdown: true },
   { id: 'energiemanagement', label: 'Energiemanagement', icon: 'Cpu', isDropdown: true },
-  // Katalog-Kategorien (für Unterleistungen und manuelle Auswahl)
-  { id: 'pv-montage', label: 'PV-Montage', icon: 'Sun', isDropdown: false },
-  { id: 'elektroinstallation', label: 'Elektroinstallation', icon: 'Plug', isDropdown: false },
-  { id: 'planung', label: 'Planung & Dokumentation', icon: 'FileText', isDropdown: false },
-  { id: 'geruest', label: 'Gerüst & Logistik', icon: 'Truck', isDropdown: false },
-  { id: 'sonstiges', label: 'Sonstiges', icon: 'MoreHorizontal', isDropdown: false }
+  { id: 'elektroinstallation', label: 'Elektroinstallation', icon: 'Plug', isDropdown: true },
+  { id: 'planung', label: 'Planung & Dokumentation', icon: 'FileText', isDropdown: true },
+  { id: 'geruest', label: 'Gerüst & Logistik', icon: 'Truck', isDropdown: true },
+  { id: 'erdungsanlage', label: 'Erdungsanlage', icon: 'Zap', isDropdown: true }
 ];
 
 // Einheiten für Leistungspositionen
@@ -83,11 +78,12 @@ export const ServiceCatalogProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Preise berechnen
+      // Preise berechnen (mit individuellem Materialaufschlag)
       const calculatedPrices = calculateServicePosition(
         serviceData.materials || [],
         serviceData.labor || [],
-        materials
+        materials,
+        serviceData.materialMarkup ?? 15
       );
 
       const newService = {
@@ -96,7 +92,8 @@ export const ServiceCatalogProvider = ({ children }) => {
         isActive: serviceData.isActive !== false,
         isDefaultPosition: serviceData.isDefaultPosition || false,
         defaultQuantity: serviceData.defaultQuantity || 1,
-        sortOrder: serviceData.sortOrder || 999
+        sortOrder: serviceData.sortOrder || 999,
+        materialMarkup: serviceData.materialMarkup ?? 15
       };
 
       await ServiceCatalogService.addService(newService);
@@ -115,16 +112,18 @@ export const ServiceCatalogProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      // Preise neu berechnen
+      // Preise neu berechnen (mit individuellem Materialaufschlag)
       const calculatedPrices = calculateServicePosition(
         serviceData.materials || [],
         serviceData.labor || [],
-        materials
+        materials,
+        serviceData.materialMarkup ?? 15
       );
 
       const updatedService = {
         ...serviceData,
-        calculatedPrices
+        calculatedPrices,
+        materialMarkup: serviceData.materialMarkup ?? 15
       };
 
       await ServiceCatalogService.updateService(serviceId, updatedService);
@@ -185,7 +184,8 @@ export const ServiceCatalogProvider = ({ children }) => {
         const calculatedPrices = calculateServicePosition(
           service.materials || [],
           service.labor || [],
-          materials
+          materials,
+          service.materialMarkup ?? 15
         );
 
         await ServiceCatalogService.updateService(service.id, {
