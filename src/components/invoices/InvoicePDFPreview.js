@@ -1,20 +1,23 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   X,
   Download,
-  Printer,
   FileText,
-  Edit
+  Edit,
+  Loader2
 } from 'lucide-react';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
-import { INVOICE_STATUS_LABELS, INVOICE_TYPE, INVOICE_TYPE_LABELS } from '../../context/InvoiceContext';
+import { INVOICE_STATUS_LABELS, INVOICE_TYPE } from '../../context/InvoiceContext';
 import { useCompany } from '../../context/CompanyContext';
+import { generatePDF } from '../../utils/pdfGenerator';
 
 const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
   const { customers } = useCustomers();
   const { projects } = useProjects();
-  const { company, invoiceTexts, footer, additionalPages } = useCompany();
+  const { company, invoiceTexts, footer } = useCompany();
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const pdfContentRef = useRef(null);
 
   const customer = useMemo(() => {
     return customers.find(c => c.id === invoice?.customerID);
@@ -41,12 +44,25 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handleDownloadPDF = async () => {
+    if (!pdfContentRef.current || isGeneratingPDF) return;
 
-  const handleDownloadPDF = () => {
-    window.print();
+    setIsGeneratingPDF(true);
+    try {
+      const filename = `Rechnung_${invoice.invoiceNumber || 'Entwurf'}`;
+      // Footer-Daten für jede Seite übergeben
+      const footerData = {
+        column1: footer?.column1 || '',
+        column2: footer?.column2 || '',
+        column3: footer?.column3 || ''
+      };
+      await generatePDF(pdfContentRef.current, filename, {}, footerData);
+    } catch (error) {
+      console.error('PDF-Generierung fehlgeschlagen:', error);
+      alert('PDF-Generierung fehlgeschlagen. Bitte versuchen Sie es erneut.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   if (!isOpen || !invoice) return null;
@@ -81,18 +97,16 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
               </button>
             )}
             <button
-              onClick={handlePrint}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
-            >
-              <Printer className="h-4 w-4 mr-1" />
-              Drucken
-            </button>
-            <button
               onClick={handleDownloadPDF}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center font-medium"
+              disabled={isGeneratingPDF}
+              className={`px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center font-medium ${isGeneratingPDF ? 'opacity-70 cursor-wait' : ''}`}
             >
-              <Download className="h-4 w-4 mr-2" />
-              PDF
+              {isGeneratingPDF ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {isGeneratingPDF ? 'Erstelle...' : 'PDF'}
             </button>
             <button
               onClick={onClose}
@@ -104,10 +118,10 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
         </div>
 
         {/* Scrollbarer Inhalt */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
-          <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none">
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-100 print:p-0 print:overflow-visible print:bg-white" id="invoice-pdf-content">
+          <div ref={pdfContentRef} className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none">
             {/* PDF Content - A4 Layout */}
-            <div className="p-8 print:p-0" id="invoice-pdf-content">
+            <div className="p-8 print:p-0">
               {/* Header */}
               <div className="flex justify-between items-start mb-8 pb-6 border-b">
                 <div>
@@ -187,7 +201,7 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
                   </thead>
                   <tbody>
                     {(invoice.items || []).map((item, index) => (
-                      <tr key={item.id || index} className="border-b border-gray-100">
+                      <tr key={item.id || index} className="border-b border-gray-100 print-no-break">
                         <td className="py-3 text-gray-600">{item.position || index + 1}</td>
                         <td className="py-3">
                           <p className="font-medium text-gray-900">{item.shortText}</p>
@@ -217,7 +231,7 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
                           <span>{formatPrice(invoice.offerTotals?.grossTotal)}</span>
                         </div>
                         <div className="flex justify-between text-green-600">
-                          <span>./. Anzahlung ({invoice.offerDepositPercent || 50}%):</span>
+                          <span>Abzgl. Anzahlung ({invoice.offerDepositPercent || 50}%):</span>
                           <span>- {formatPrice(invoice.depositAmount || (invoice.offerTotals?.grossTotal * (invoice.offerDepositPercent || 50) / 100))}</span>
                         </div>
                         <div className="flex justify-between border-t pt-2 font-medium">
@@ -232,10 +246,15 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
                       <span className="text-gray-600">Netto:</span>
                       <span>{formatPrice(invoice.totals?.netTotal)}</span>
                     </div>
-                    {(invoice.totals?.taxRate > 0) && (
+                    {(invoice.totals?.taxRate > 0) ? (
                       <div className="flex justify-between">
                         <span className="text-gray-600">MwSt ({invoice.totals?.taxRate}%):</span>
                         <span>{formatPrice(invoice.totals?.taxAmount)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">0% MwSt. nach §12 UStG</span>
+                        <span>{formatPrice(0)}</span>
                       </div>
                     )}
                     <div className="flex justify-between border-t-2 border-gray-900 pt-2 text-lg font-bold">
@@ -287,62 +306,56 @@ const InvoicePDFPreview = ({ invoice, isOpen, onClose, onEdit }) => {
                 <p className="mt-4">{invoiceTexts.signature}</p>
                 <p className="mt-2 font-medium text-gray-700">{company.name}</p>
               </div>
-
-              {/* Fußzeile */}
-              {(footer?.column1 || footer?.column2 || footer?.column3) && (
-                <div className="mt-8 pt-4 border-t border-gray-300">
-                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
-                    <div className="whitespace-pre-line">{footer?.column1}</div>
-                    <div className="whitespace-pre-line text-center">{footer?.column2}</div>
-                    <div className="whitespace-pre-line text-right">{footer?.column3}</div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
-
-          {/* Zusätzliche Seiten */}
-          {additionalPages && additionalPages.length > 0 && additionalPages.map((page, index) => (
-            <div key={page.id || index} className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none mt-6 break-before-page">
-              <div className="p-8 print:p-0 min-h-[297mm] flex flex-col">
-                <div className="flex-1">
-                  {page.title && (
-                    <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b">{page.title}</h2>
-                  )}
-                  <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-                    {page.content}
-                  </div>
-                </div>
-                {(footer?.column1 || footer?.column2 || footer?.column3) && (
-                  <div className="mt-auto pt-4 border-t border-gray-300">
-                    <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
-                      <div className="whitespace-pre-line">{footer?.column1}</div>
-                      <div className="whitespace-pre-line text-center">{footer?.column2}</div>
-                      <div className="whitespace-pre-line text-right">{footer?.column3}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 
       {/* Print Styles */}
       <style>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 15mm;
+          }
+
           body * {
             visibility: hidden;
           }
-          #invoice-pdf-content, #invoice-pdf-content * {
+
+          #invoice-pdf-content,
+          #invoice-pdf-content * {
             visibility: visible;
           }
+
           #invoice-pdf-content {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
-            padding: 20mm;
+          }
+
+          /* Seitenumbrüche für zusätzliche Seiten */
+          .break-before-page {
+            page-break-before: always;
+            break-before: page;
+          }
+
+          /* Positionen nicht umbrechen */
+          .print-no-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          /* Tabellen-Header auf jeder Seite wiederholen */
+          thead {
+            display: table-header-group;
+          }
+
+          /* Footer nicht umbrechen */
+          .print-footer {
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
         }
       `}</style>

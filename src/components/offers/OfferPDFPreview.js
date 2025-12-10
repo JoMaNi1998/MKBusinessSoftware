@@ -1,26 +1,35 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   X,
   Download,
-  Printer,
   FileText,
   Edit,
-  Receipt
+  Receipt,
+  Loader2,
+  File,
+  ExternalLink
 } from 'lucide-react';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
-import { OFFER_STATUS_LABELS, OFFER_STATUS } from '../../context/OfferContext';
+import { useMaterials } from '../../context/MaterialContext';
 import { useInvoices } from '../../context/InvoiceContext';
 import { useCompany } from '../../context/CompanyContext';
+import { generatePDF } from '../../utils/pdfGenerator';
+
+// Spezifikations-ID für PMAX_DC (Modulleistung in Wp)
+const SPEC_PMAX_DC = 'l5YKWiis3xv1nM5BAawD';
 
 const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
   const navigate = useNavigate();
   const { customers } = useCustomers();
   const { projects } = useProjects();
+  const { materials } = useMaterials();
   const { hasDepositInvoice, getInvoicesByOffer, createInvoiceFromOffer } = useInvoices();
   const { company, offerTexts, footer, additionalPages } = useCompany();
-  const [isCreatingInvoice, setIsCreatingInvoice] = React.useState(false);
+  const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const pdfContentRef = useRef(null);
 
   // Prüfen welcher Rechnungstyp als nächstes erstellt werden soll
   const depositExists = offer ? hasDepositInvoice(offer.id) : false;
@@ -33,6 +42,30 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
   const project = useMemo(() => {
     return projects.find(p => p.id === offer?.projectID);
   }, [projects, offer?.projectID]);
+
+  // kWp-Berechnung aus PV-Montage Positionen
+  const totalKwp = useMemo(() => {
+    const pvItems = (offer?.items || []).filter(item => item.category === 'pv-montage');
+    if (pvItems.length === 0) return null;
+
+    let totalWp = 0;
+
+    for (const pvItem of pvItems) {
+      const itemMaterials = pvItem.breakdown?.materials || [];
+
+      for (const mat of itemMaterials) {
+        const materialData = materials.find(m => m.id === mat.materialID);
+        const pmaxDc = parseFloat(materialData?.specifications?.[SPEC_PMAX_DC]);
+
+        if (pmaxDc && mat.quantity) {
+          totalWp += pmaxDc * mat.quantity * pvItem.quantity;
+        }
+      }
+    }
+
+    if (totalWp === 0) return null;
+    return (totalWp / 1000).toFixed(2);
+  }, [offer?.items, materials]);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('de-DE', {
@@ -51,12 +84,25 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handleDownloadPDF = async () => {
+    if (!pdfContentRef.current || isGeneratingPDF) return;
 
-  const handleDownloadPDF = () => {
-    window.print();
+    setIsGeneratingPDF(true);
+    try {
+      const filename = `Angebot_${offer.offerNumber || 'Entwurf'}`;
+      // Footer-Daten für jede Seite übergeben
+      const footerData = {
+        column1: footer?.column1 || '',
+        column2: footer?.column2 || '',
+        column3: footer?.column3 || ''
+      };
+      await generatePDF(pdfContentRef.current, filename, {}, footerData);
+    } catch (error) {
+      console.error('PDF-Generierung fehlgeschlagen:', error);
+      alert('PDF-Generierung fehlgeschlagen. Bitte versuchen Sie es erneut.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const handleCreateInvoice = async () => {
@@ -117,18 +163,16 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                 {depositExists ? 'Schlussrechnung' : 'Anzahlungsrechnung'}
               </button>
             <button
-              onClick={handlePrint}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
-            >
-              <Printer className="h-4 w-4 mr-1" />
-              Drucken
-            </button>
-            <button
               onClick={handleDownloadPDF}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center font-medium"
+              disabled={isGeneratingPDF}
+              className={`px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center font-medium ${isGeneratingPDF ? 'opacity-70 cursor-wait' : ''}`}
             >
-              <Download className="h-4 w-4 mr-2" />
-              PDF
+              {isGeneratingPDF ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {isGeneratingPDF ? 'Erstelle...' : 'PDF'}
             </button>
             <button
               onClick={onClose}
@@ -140,14 +184,19 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
         </div>
 
         {/* Scrollbarer Inhalt - nur eine Scrollbar */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
-          <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none">
-            {/* PDF Content - A4 Layout */}
-            <div className="p-8 print:p-0" id="offer-pdf-content">
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-100 print:p-0 print:overflow-visible print:bg-white" id="offer-pdf-content">
+          {/* PDF Content Wrapper - enthält alle Seiten für PDF-Export */}
+          <div ref={pdfContentRef} className="pdf-export-container">
+            {/* Hauptseite */}
+            <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none">
+              {/* PDF Content - A4 Layout */}
+              <div className="p-8 print:p-0">
               {/* Header */}
               <div className="flex justify-between items-start mb-8 pb-6 border-b">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    ANGEBOT {totalKwp && <span className="text-lg font-normal text-gray-600">({totalKwp} kWp)</span>}
+                  </h1>
                 </div>
                 <div className="text-right text-sm text-gray-600">
                   <p className="font-medium text-gray-900">{company.name}</p>
@@ -177,7 +226,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Datum:</span>
-                      <span>{formatDate(offer.createdAt)}</span>
+                      <span>{formatDate(offer.offerDate || offer.createdAt)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Gültig bis:</span>
@@ -216,7 +265,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                   </thead>
                   <tbody>
                     {(offer.items || []).map((item, index) => (
-                      <tr key={item.id || index} className="border-b border-gray-100">
+                      <tr key={item.id || index} className="border-b border-gray-100 print-no-break">
                         <td className="py-3 text-gray-600">{item.position || index + 1}</td>
                         <td className="py-3">
                           <p className="font-medium text-gray-900">{item.shortText}</p>
@@ -235,7 +284,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
               </div>
 
               {/* Summen */}
-              <div className="flex justify-end mb-8">
+              <div className="flex justify-end mb-8 print-no-break">
                 <div className="w-64">
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -252,10 +301,15 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                       <span className="text-gray-600">Netto:</span>
                       <span>{formatPrice(offer.totals?.netTotal)}</span>
                     </div>
-                    {(offer.totals?.taxRate > 0) && (
+                    {(offer.totals?.taxRate > 0) ? (
                       <div className="flex justify-between">
                         <span className="text-gray-600">MwSt ({offer.totals?.taxRate}%):</span>
                         <span>{formatPrice(offer.totals?.taxAmount)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">0% MwSt. nach §12 UStG</span>
+                        <span>{formatPrice(0)}</span>
                       </div>
                     )}
                     <div className="flex justify-between border-t-2 border-gray-900 pt-2 text-lg font-bold">
@@ -280,7 +334,7 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
               </div>
 
               {/* Footer */}
-              <div className="border-t pt-6 text-sm text-gray-600 space-y-3">
+              <div className="border-t pt-6 text-sm text-gray-600 space-y-3 print-no-break">
                 {(offer.depositPercent > 0) && (
                   <>
                     <p>
@@ -297,26 +351,43 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                 <p className="mt-4">{offerTexts.signature}</p>
                 <p className="mt-2 font-medium text-gray-700">{company.name}</p>
               </div>
-
-              {/* Fußzeile */}
-              {(footer?.column1 || footer?.column2 || footer?.column3) && (
-                <div className="mt-8 pt-4 border-t border-gray-300">
-                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
-                    <div className="whitespace-pre-line">{footer?.column1}</div>
-                    <div className="whitespace-pre-line text-center">{footer?.column2}</div>
-                    <div className="whitespace-pre-line text-right">{footer?.column3}</div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
+          {/* PV-Konfiguration Dateien Anzeige (außerhalb PDF) */}
+          {offer.pvConfigFiles && offer.pvConfigFiles.length > 0 && (
+            <div className="max-w-[210mm] mx-auto mt-6 bg-green-50 border border-green-200 rounded-lg p-4 print:hidden">
+              <div className="flex items-center space-x-2 mb-3">
+                <File className="h-5 w-5 text-green-600" />
+                <h3 className="font-medium text-green-900">PV-Konfiguration ({offer.pvConfigFiles.length} Datei{offer.pvConfigFiles.length > 1 ? 'en' : ''})</h3>
+              </div>
+              <div className="space-y-2">
+                {offer.pvConfigFiles.map(file => (
+                  <a
+                    key={file.id}
+                    href={file.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between bg-white border border-green-200 rounded-lg px-3 py-2 hover:bg-green-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <File className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                        <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-green-600" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Zusätzliche Seiten */}
-          {additionalPages && additionalPages.length > 0 && additionalPages.map((page, index) => (
-            <div key={page.id || index} className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none mt-6 break-before-page">
-              <div className="p-8 print:p-0 min-h-[297mm] flex flex-col">
-                {/* Seiteninhalt */}
-                <div className="flex-1">
+            {additionalPages && additionalPages.length > 0 && additionalPages.map((page, index) => (
+              <div key={page.id || index} className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none mt-6 pdf-page-break">
+                <div className="p-8 print:p-0">
                   {/* Seitentitel */}
                   {page.title && (
                     <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b">{page.title}</h2>
@@ -327,38 +398,74 @@ const OfferPDFPreview = ({ offer, isOpen, onClose, onEdit }) => {
                     {page.content}
                   </div>
                 </div>
-
-                {/* Fußzeile auf zusätzlichen Seiten - immer unten */}
-                {(footer?.column1 || footer?.column2 || footer?.column3) && (
-                  <div className="mt-auto pt-4 border-t border-gray-300">
-                    <div className="grid grid-cols-3 gap-4 text-xs text-gray-600">
-                      <div className="whitespace-pre-line">{footer?.column1}</div>
-                      <div className="whitespace-pre-line text-center">{footer?.column2}</div>
-                      <div className="whitespace-pre-line text-right">{footer?.column3}</div>
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Print Styles */}
       <style>{`
         @media print {
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+
+          /* Browser Header/Footer ausblenden */
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
           body * {
             visibility: hidden;
           }
-          #offer-pdf-content, #offer-pdf-content * {
+
+          #offer-pdf-content,
+          #offer-pdf-content * {
             visibility: visible;
           }
+
           #offer-pdf-content {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
-            padding: 20mm;
+            padding: 5mm;
+          }
+
+          /* Seitenumbrüche für zusätzliche Seiten */
+          .break-before-page {
+            page-break-before: always;
+            break-before: page;
+          }
+
+          /* Positionen nicht umbrechen */
+          .print-no-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          /* Tabellen-Header auf jeder Seite wiederholen */
+          thead {
+            display: table-header-group;
+          }
+
+          /* Footer nicht umbrechen */
+          .print-footer {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          /* Keine Hintergrundfarben im Druck */
+          .bg-gray-100, .bg-white {
+            background: white !important;
+          }
+
+          /* Schatten entfernen */
+          .shadow-lg {
+            box-shadow: none !important;
           }
         }
       `}</style>

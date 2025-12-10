@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Angebots-Dateien (PV-Konfiguration)
+    match /offers/{offerId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Allgemeine Regel für alle anderen Dateien
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

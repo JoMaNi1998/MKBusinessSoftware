@@ -4,9 +4,7 @@ import {
   Percent,
   Receipt,
   FileText,
-  Save,
   RefreshCw,
-  AlertCircle,
   Info,
   TrendingDown,
   Plus,
@@ -16,7 +14,6 @@ import {
   Layers
 } from 'lucide-react';
 import { useCalculation } from '../../context/CalculationContext';
-import { useNotification } from '../../context/NotificationContext';
 
 // Labels und Icons für Arbeitszeitfaktoren
 const LABOR_FACTOR_CONFIG = {
@@ -38,22 +35,25 @@ const LABOR_FACTOR_CONFIG = {
 };
 
 const CalculationSettings = () => {
-  const { settings, loading, saving, saveSettings, DEFAULT_SETTINGS } = useCalculation();
-  const { showNotification } = useNotification();
+  const { settings, loading, saveSettings, DEFAULT_SETTINGS } = useCalculation();
 
   const [localSettings, setLocalSettings] = useState(settings);
-  const [hasChanges, setHasChanges] = useState(false);
 
   // Lokale Settings aktualisieren wenn Firebase-Settings geladen werden
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
 
-  // Änderungen tracken
+  // Autosave bei Änderungen
   useEffect(() => {
     const changed = JSON.stringify(localSettings) !== JSON.stringify(settings);
-    setHasChanges(changed);
-  }, [localSettings, settings]);
+    if (changed) {
+      const timer = setTimeout(() => {
+        saveSettings(localSettings);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [localSettings, settings, saveSettings]);
 
   const handleChange = (section, key, value) => {
     setLocalSettings(prev => ({
@@ -80,19 +80,6 @@ const CalculationSettings = () => {
     }));
   };
 
-  const handleSave = async () => {
-    const result = await saveSettings(localSettings);
-    if (result.success) {
-      showNotification('Kalkulationseinstellungen gespeichert', 'success');
-    } else {
-      showNotification('Fehler beim Speichern', 'error');
-    }
-  };
-
-  const handleReset = () => {
-    setLocalSettings(DEFAULT_SETTINGS);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -104,42 +91,9 @@ const CalculationSettings = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Kalkulation & Angebote</h2>
-          <p className="text-sm text-gray-500">Stundensätze, Zuschläge und Angebotseinstellungen</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          {hasChanges && (
-            <span className="flex items-center text-sm text-amber-600">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              Ungespeicherte Änderungen
-            </span>
-          )}
-          <button
-            onClick={handleReset}
-            className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
-          >
-            <RefreshCw className="h-4 w-4 inline mr-1" />
-            Zurücksetzen
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !hasChanges}
-            className={`px-4 py-2 rounded-lg flex items-center text-sm font-medium ${
-              hasChanges
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {saving ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Speichern
-          </button>
-        </div>
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Kalkulation & Angebote</h2>
+        <p className="text-sm text-gray-500">Stundensätze, Zuschläge und Angebotseinstellungen</p>
       </div>
 
       {/* Stundensätze */}

@@ -30,7 +30,11 @@ import {
   Sun,
   Plug,
   Truck,
-  MoreHorizontal
+  MoreHorizontal,
+  Upload,
+  File,
+  X,
+  Loader2
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useOffers, OFFER_STATUS } from '../../context/OfferContext';
@@ -42,6 +46,8 @@ import { useMaterials } from '../../context/MaterialContext';
 import { useNotification } from '../../context/NotificationContext';
 import { useCompany } from '../../context/CompanyContext';
 import { OfferService } from '../../services/firebaseService';
+import { storage } from '../../config/firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import BaseModal from '../BaseModal';
 import { OFFER_STATUS_LABELS } from '../../context/OfferContext';
 
@@ -78,6 +84,7 @@ const OfferConfigurator = () => {
   // Angebotsdaten
   const [offerData, setOfferData] = useState({
     items: [],
+    offerDate: new Date().toISOString().split('T')[0], // Angebotsdatum
     totals: {
       subtotalNet: 0,
       discountPercent: 0,
@@ -97,6 +104,10 @@ const OfferConfigurator = () => {
   });
 
   const [validationErrors, setValidationErrors] = useState({});
+
+  // PV-Konfiguration Datei-Upload State
+  const [pvConfigFiles, setPvConfigFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Arbeitszeitfaktoren pro Gewerk (vereinfacht)
   const [laborFactorSelections, setLaborFactorSelections] = useState({
@@ -179,6 +190,9 @@ const OfferConfigurator = () => {
         setSelectedProject(existingOffer.projectID || '');
         setOfferData({
           offerNumber: existingOffer.offerNumber || '',
+          offerDate: existingOffer.offerDate
+            ? (existingOffer.offerDate.split ? existingOffer.offerDate.split('T')[0] : existingOffer.offerDate)
+            : new Date().toISOString().split('T')[0],
           items: existingOffer.items || [],
           totals: existingOffer.totals || {},
           conditions: existingOffer.conditions || {},
@@ -198,6 +212,11 @@ const OfferConfigurator = () => {
 
         setSelectedServices(prev => ({ ...prev, ...reconstructedServices }));
         setServiceQuantities(prev => ({ ...prev, ...reconstructedQuantities }));
+
+        // PV-Konfiguration Dateien laden
+        if (existingOffer.pvConfigFiles) {
+          setPvConfigFiles(existingOffer.pvConfigFiles);
+        }
       }
     } else {
       // Angebotsnummer für neues Angebot generieren
@@ -267,6 +286,33 @@ const OfferConfigurator = () => {
     if (!selectedCustomer) return [];
     return projects.filter(p => p.customerID === selectedCustomer);
   }, [projects, selectedCustomer]);
+
+  // Spezifikations-ID für PMAX_DC (Modulleistung in Wp)
+  const SPEC_PMAX_DC = 'l5YKWiis3xv1nM5BAawD';
+
+  // kWp-Berechnung aus PV-Montage Positionen
+  const totalKwp = useMemo(() => {
+    const pvItems = offerData.items.filter(item => item.category === 'pv-montage');
+    if (pvItems.length === 0) return null;
+
+    let totalWp = 0;
+
+    for (const pvItem of pvItems) {
+      const itemMaterials = pvItem.breakdown?.materials || [];
+
+      for (const mat of itemMaterials) {
+        const materialData = materials.find(m => m.id === mat.materialID);
+        const pmaxDc = parseFloat(materialData?.specifications?.[SPEC_PMAX_DC]);
+
+        if (pmaxDc && mat.quantity) {
+          totalWp += pmaxDc * mat.quantity * pvItem.quantity;
+        }
+      }
+    }
+
+    if (totalWp === 0) return null;
+    return (totalWp / 1000).toFixed(2);
+  }, [offerData.items, materials]);
 
   // Services nach Kategorie gruppiert und gefiltert
   const filteredServicesByCategory = useMemo(() => {
@@ -657,6 +703,79 @@ const OfferConfigurator = () => {
     setCurrentStep(prev => Math.max(prev - 1, 0));
   };
 
+  // Datei-Upload für PV-Konfiguration
+  const handleFileUpload = async (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    try {
+      const uploadedFiles = [];
+      const offerNum = offerData.offerNumber || `temp-${Date.now()}`;
+
+      for (const file of files) {
+        // Nur PDF und Bilder erlauben
+        if (!file.type.match(/^(application\/pdf|image\/.*)$/)) {
+          showNotification(`${file.name}: Nur PDF und Bilder erlaubt`, 'error');
+          continue;
+        }
+
+        // Max 10MB
+        if (file.size > 10 * 1024 * 1024) {
+          showNotification(`${file.name}: Datei zu groß (max 10MB)`, 'error');
+          continue;
+        }
+
+        const timestamp = Date.now();
+        const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const storagePath = `offers/${offerNum}/pv-config/${timestamp}_${safeName}`;
+        const storageRef = ref(storage, storagePath);
+
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        uploadedFiles.push({
+          id: `file-${timestamp}`,
+          name: file.name,
+          path: storagePath,
+          url: downloadURL,
+          type: file.type,
+          size: file.size,
+          uploadedAt: new Date().toISOString()
+        });
+      }
+
+      if (uploadedFiles.length > 0) {
+        setPvConfigFiles(prev => [...prev, ...uploadedFiles]);
+        showNotification(`${uploadedFiles.length} Datei(en) hochgeladen`, 'success');
+      }
+    } catch (error) {
+      console.error('Upload-Fehler:', error);
+      showNotification('Fehler beim Hochladen', 'error');
+    } finally {
+      setIsUploading(false);
+      // Input zurücksetzen
+      event.target.value = '';
+    }
+  };
+
+  // Datei löschen
+  const handleDeleteFile = async (fileToDelete) => {
+    try {
+      // Aus Storage löschen
+      const storageRef = ref(storage, fileToDelete.path);
+      await deleteObject(storageRef);
+
+      // Aus State entfernen
+      setPvConfigFiles(prev => prev.filter(f => f.id !== fileToDelete.id));
+      showNotification('Datei gelöscht', 'success');
+    } catch (error) {
+      console.error('Löschfehler:', error);
+      // Datei vielleicht schon gelöscht - trotzdem aus State entfernen
+      setPvConfigFiles(prev => prev.filter(f => f.id !== fileToDelete.id));
+    }
+  };
+
   // Speichern
   const handleSave = async (status = OFFER_STATUS.DRAFT) => {
     if (!validateStep(currentStep)) return;
@@ -667,6 +786,7 @@ const OfferConfigurator = () => {
         ...offerData,
         customerID: selectedCustomer,
         projectID: selectedProject,
+        pvConfigFiles: pvConfigFiles,
         status
       };
 
@@ -865,6 +985,77 @@ const OfferConfigurator = () => {
           </div>
         )}
 
+        {/* PV-Konfiguration Upload */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              <Sun className="h-5 w-5 text-green-600" />
+              <h4 className="font-medium text-green-900">PV-Konfiguration</h4>
+            </div>
+            <label className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center cursor-pointer text-sm ${isUploading ? 'opacity-70 cursor-wait' : ''}`}>
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              {isUploading ? 'Wird hochgeladen...' : 'Datei hochladen'}
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                multiple
+                onChange={handleFileUpload}
+                disabled={isUploading}
+                className="hidden"
+              />
+            </label>
+          </div>
+          <p className="text-xs text-green-700 mb-3">Laden Sie die PV-Konfiguration (PDF oder Bild) hoch, um sie dem Angebot beizufügen.</p>
+
+          {/* Hochgeladene Dateien */}
+          {pvConfigFiles.length > 0 && (
+            <div className="space-y-2">
+              {pvConfigFiles.map(file => (
+                <div key={file.id} className="flex items-center justify-between bg-white border border-green-200 rounded-lg px-3 py-2">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <File className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                      title="Öffnen"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </a>
+                    <button
+                      onClick={() => handleDeleteFile(file)}
+                      className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                      title="Löschen"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {pvConfigFiles.length === 0 && (
+            <div className="text-center py-4 border-2 border-dashed border-green-200 rounded-lg">
+              <File className="h-8 w-8 mx-auto text-green-300 mb-2" />
+              <p className="text-sm text-green-600">Noch keine Dateien hochgeladen</p>
+            </div>
+          )}
+        </div>
+
         {/* Katalog-Kategorien (nicht-Dropdown) ausklappbar */}
         <div className="border rounded-lg overflow-hidden">
           <div className="bg-gray-50 px-4 py-3">
@@ -970,7 +1161,9 @@ const OfferConfigurator = () => {
             {/* Header */}
             <div className="flex justify-between items-start mb-8 pb-6 border-b">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  ANGEBOT {totalKwp && <span className="text-lg font-normal text-gray-600">({totalKwp} kWp)</span>}
+                </h1>
               </div>
               <div className="text-right text-sm text-gray-600">
                 <p className="font-medium text-gray-900">{company.name}</p>
@@ -997,14 +1190,27 @@ const OfferConfigurator = () => {
                 </div>
               </div>
               <div className="text-right">
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-end gap-2">
                     <span className="text-gray-500">Datum:</span>
-                    <span>{formatDateLocal(new Date())}</span>
+                    <input
+                      type="date"
+                      value={offerData.offerDate || ''}
+                      onChange={(e) => setOfferData(prev => ({ ...prev, offerDate: e.target.value }))}
+                      className="border border-gray-300 rounded px-2 py-1 text-sm"
+                    />
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex items-center justify-end gap-2">
                     <span className="text-gray-500">Gültig bis:</span>
-                    <span>{formatDateLocal(offerData.conditions?.validUntil)}</span>
+                    <input
+                      type="date"
+                      value={offerData.conditions?.validUntil || ''}
+                      onChange={(e) => setOfferData(prev => ({
+                        ...prev,
+                        conditions: { ...prev.conditions, validUntil: e.target.value }
+                      }))}
+                      className="border border-gray-300 rounded px-2 py-1 text-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -1332,8 +1538,10 @@ const OfferConfigurator = () => {
             {/* Header */}
             <div className="flex justify-between items-start mb-8 pb-6 border-b">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">ANGEBOT</h1>
-                              </div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  ANGEBOT {totalKwp && <span className="text-lg font-normal text-gray-600">({totalKwp} kWp)</span>}
+                </h1>
+              </div>
               <div className="text-right text-sm text-gray-600">
                 <p className="font-medium text-gray-900">{company.name}</p>
                 <p>{company.street}</p>
@@ -1362,7 +1570,7 @@ const OfferConfigurator = () => {
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Datum:</span>
-                    <span>{formatDate(new Date())}</span>
+                    <span>{formatDate(offerData.offerDate)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Gültig bis:</span>
@@ -1447,10 +1655,15 @@ const OfferConfigurator = () => {
                     <span className="text-gray-600">Netto:</span>
                     <span>{formatPrice(offerData.totals?.netTotal)}</span>
                   </div>
-                  {(offerData.totals?.taxRate > 0) && (
+                  {(offerData.totals?.taxRate > 0) ? (
                     <div className="flex justify-between">
                       <span className="text-gray-600">MwSt ({offerData.totals?.taxRate}%):</span>
                       <span>{formatPrice(offerData.totals?.taxAmount)}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">0% MwSt. nach §12 UStG</span>
+                      <span>{formatPrice(0)}</span>
                     </div>
                   )}
                   <div className="flex justify-between border-t-2 border-gray-900 pt-2 text-lg font-bold">

@@ -969,7 +969,7 @@ const Settings = () => {
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="text-md font-medium text-gray-900 flex items-center">
                     <FileText className="h-5 w-5 mr-2 text-gray-500" />
-                    Zusätzliche Seiten (Widerrufsrecht, Garantien, etc.)
+                    Zusätzliche Seiten für Angebote (Widerrufsrecht, Garantien, etc.)
                   </h4>
                   <button
                     type="button"
