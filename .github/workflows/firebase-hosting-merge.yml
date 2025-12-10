@@ -38,8 +38,8 @@ jobs:
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/332063299881/locations/global/workloadIdentityPools/github/providers/github-provider'
-          service_account: 'firebase-github-deploy@lager-d3a17.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/72172721680/locations/global/workloadIdentityPools/github/providers/github-provider'
+          service_account: 'firebase-github-deploy@mkbusinesssoftware.iam.gserviceaccount.com'
           create_credentials_file: true
           export_environment_variables: true
           access_token_scopes: 'email, openid, https://www.googleapis.com/auth/cloud-platform, https://www.googleapis.com/auth/firebase'
@@ -48,13 +48,13 @@ jobs:
         run: npm install -g firebase-tools
 
       - name: Deploy Hosting
-        run: firebase deploy --only hosting --project lager-d3a17
+        run: firebase deploy --only hosting --project mkbusinesssoftware
 
       - name: Deploy Firestore Rules
-        run: firebase deploy --only firestore:rules --project lager-d3a17
+        run: firebase deploy --only firestore:rules --project mkbusinesssoftware
 
       - name: Deploy Storage Rules
-        run: firebase deploy --only storage --project lager-d3a17
+        run: firebase deploy --only storage --project mkbusinesssoftware
 
       - name: Deploy Functions
-        run: firebase deploy --only functions --project lager-d3a17 --force
+        run: firebase deploy --only functions --project mkbusinesssoftware --force

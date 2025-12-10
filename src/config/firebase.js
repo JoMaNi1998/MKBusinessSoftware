@@ -5,12 +5,13 @@ import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCY7Ft5BvH7fdNHH6yG9C3MQgylR05aM6k",
-  authDomain: "lager-d3a17.firebaseapp.com",
-  projectId: "lager-d3a17",
-  storageBucket: "lager-d3a17.firebasestorage.app",
-  messagingSenderId: "332063299881",
-  appId: "1:332063299881:web:d7aa8304b71785ec70ff38"
+  apiKey: "AIzaSyDgMnsvaoUiygFzMeOmijrPrLHzVX6M7U4",
+  authDomain: "mkbusinesssoftware.firebaseapp.com",
+  projectId: "mkbusinesssoftware",
+  storageBucket: "mkbusinesssoftware.firebasestorage.app",
+  messagingSenderId: "72172721680",
+  appId: "1:72172721680:web:0b9f8a03df159f7e6cdc95",
+  measurementId: "G-JNT8HQFTF5"
 };
 
 // Initialize Firebase

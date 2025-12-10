@@ -1,7 +1,6 @@
 {
   "projects": {
-    "default": "lager-d3a17",
-    "production": "lager-d3a17",
-    "development": "lager-d3a17"
+    "default": "mkbusinesssoftware",
+    "production": "mkbusinesssoftware"
   }
 }

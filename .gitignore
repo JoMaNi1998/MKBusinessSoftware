@@ -1,1 +1,35 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Build
+build/
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Firebase
+.firebase/
+*-debug.log
+firebase-debug.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Service Account Keys (NIEMALS committen!)
+**/serviceAccount*.json
+**/firebase-adminsdk*.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

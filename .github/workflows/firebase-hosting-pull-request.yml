@@ -31,8 +31,8 @@ jobs:
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/332063299881/locations/global/workloadIdentityPools/github/providers/github-provider'
-          service_account: 'firebase-github-deploy@lager-d3a17.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/72172721680/locations/global/workloadIdentityPools/github/providers/github-provider'
+          service_account: 'firebase-github-deploy@mkbusinesssoftware.iam.gserviceaccount.com'
           create_credentials_file: true
           export_environment_variables: true
           access_token_scopes: 'email, openid, https://www.googleapis.com/auth/cloud-platform, https://www.googleapis.com/auth/firebase'
@@ -41,4 +41,4 @@ jobs:
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ steps.auth.outputs.credentials_file_path }}'
-          projectId: lager-d3a17
+          projectId: mkbusinesssoftware
