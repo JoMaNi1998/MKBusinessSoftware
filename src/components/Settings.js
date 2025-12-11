@@ -43,7 +43,7 @@ const Settings = () => {
   const { showNotification } = useNotification();
   const { materials } = useMaterials();
   const { user } = useAuth();
-  const { isAdmin } = useRole();
+  const { isAdmin, setupFirstAdmin, userRole } = useRole();
   const { settings: companySettings, saveSettings: saveCompanySettings, saving: savingCompany } = useCompany();
   const { saving: calculationSaving } = useCalculation();
   const [activeTab, setActiveTab] = useState('users');
@@ -58,6 +58,7 @@ const Settings = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [newUserRole, setNewUserRole] = useState('monteur');
   const [assigningRole, setAssigningRole] = useState(false);
+  const [settingUpAdmin, setSettingUpAdmin] = useState(false);
   
   // PV Configurator Default Settings
   const [pvDefaults, setPvDefaults] = useState({
@@ -1070,6 +1071,49 @@ const Settings = () => {
 
           {activeTab === 'users' && (
             <div className="space-y-6">
+              {/* Admin Setup Banner - nur anzeigen wenn kein Admin existiert */}
+              {!isAdmin() && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex">
+                      <Shield className="h-5 w-5 text-yellow-400 mr-3" />
+                      <div>
+                        <h3 className="text-sm font-medium text-yellow-800">
+                          Erster Admin einrichten
+                        </h3>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          Klicken Sie hier, um sich als ersten Administrator einzurichten.
+                          Aktuelle Rolle: {userRole || 'Keine'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setSettingUpAdmin(true);
+                        try {
+                          const result = await setupFirstAdmin();
+                          showNotification('success', result.message || 'Sie sind jetzt Administrator!');
+                          window.location.reload();
+                        } catch (error) {
+                          showNotification('error', error.message || 'Fehler beim Einrichten des Admins');
+                        } finally {
+                          setSettingUpAdmin(false);
+                        }
+                      }}
+                      disabled={settingUpAdmin}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50"
+                    >
+                      {settingUpAdmin ? (
+                        <Loader className="animate-spin h-4 w-4 mr-2" />
+                      ) : (
+                        <Shield className="h-4 w-4 mr-2" />
+                      )}
+                      {settingUpAdmin ? 'Wird eingerichtet...' : 'Admin werden'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">Benutzerverwaltung</h3>
