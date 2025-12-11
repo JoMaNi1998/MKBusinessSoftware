@@ -1,5 +1,5 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { beforeUserCreated } = require('firebase-functions/v2/identity');
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -121,9 +121,9 @@ exports.setupFirstAdmin = onCall(async (request) => {
 
 /**
  * Trigger: Neue Benutzer automatisch als Mitarbeiter einrichten
+ * Verwendet onCreate (v1) statt beforeUserCreated - keine Identity Platform nötig
  */
-exports.onUserCreate = beforeUserCreated(async (event) => {
-  const user = event.data;
+exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
   try {
     // Prüfen ob bereits Admins existieren
     const existingAdmins = await admin.firestore()
@@ -138,7 +138,10 @@ exports.onUserCreate = beforeUserCreated(async (event) => {
         permissions: ROLES.monteur.permissions
       };
 
-      // Custom Claims werden nach der Erstellung gesetzt
+      // Custom Claims setzen
+      await admin.auth().setCustomUserClaims(user.uid, defaultClaims);
+
+      // In Firestore speichern
       await admin.firestore().collection('users').doc(user.uid).set({
         email: user.email,
         displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
@@ -146,10 +149,6 @@ exports.onUserCreate = beforeUserCreated(async (event) => {
         permissions: ROLES.monteur.permissions,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
-
-      return {
-        customClaims: defaultClaims
-      };
     }
   } catch (error) {
     console.error('Fehler beim Einrichten des neuen Benutzers:', error);
