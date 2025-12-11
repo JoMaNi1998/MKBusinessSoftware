@@ -106,7 +106,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           <div className="flex justify-center">
             <UserAvatar />
           </div>
-          
+
           {/* Version Info */}
           <div className="bg-gray-50 rounded-lg p-3 text-center">
             <p className="text-xs text-gray-500">Version 1.0.0</p>
