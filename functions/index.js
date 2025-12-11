@@ -1,5 +1,4 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { user } = require('firebase-functions/v1/auth');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -120,38 +119,58 @@ exports.setupFirstAdmin = onCall(async (request) => {
 });
 
 /**
- * Trigger: Neue Benutzer automatisch als Mitarbeiter einrichten
- * Verwendet onCreate (v1) statt beforeUserCreated - keine Identity Platform nötig
+ * Cloud Function: Neuen Benutzer einrichten (manuell aufgerufen nach Registrierung)
+ * Ersetzt den automatischen Trigger - keine Identity Platform nötig
  */
-exports.onUserCreate = user().onCreate(async (userRecord) => {
+exports.setupNewUser = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Benutzer muss angemeldet sein');
+  }
+
+  const uid = request.auth.uid;
+
   try {
+    // Prüfen ob User bereits eingerichtet
+    const existingUser = await admin.firestore().collection('users').doc(uid).get();
+    if (existingUser.exists) {
+      return { success: true, message: 'Benutzer bereits eingerichtet', role: existingUser.data().role };
+    }
+
     // Prüfen ob bereits Admins existieren
     const existingAdmins = await admin.firestore()
       .collection('users')
       .where('role', '==', 'admin')
       .get();
 
-    // Wenn Admins existieren, als Monteur einrichten
-    if (!existingAdmins.empty) {
-      const defaultClaims = {
-        role: 'monteur',
-        permissions: ROLES.monteur.permissions
-      };
-
-      // Custom Claims setzen
-      await admin.auth().setCustomUserClaims(userRecord.uid, defaultClaims);
-
-      // In Firestore speichern
-      await admin.firestore().collection('users').doc(userRecord.uid).set({
-        email: userRecord.email,
-        displayName: userRecord.displayName || (userRecord.email ? userRecord.email.split('@')[0] : 'User'),
-        role: 'monteur',
-        permissions: ROLES.monteur.permissions,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+    // Wenn keine Admins existieren, nichts tun (User muss setupFirstAdmin aufrufen)
+    if (existingAdmins.empty) {
+      return { success: false, message: 'Kein Admin vorhanden. Bitte setupFirstAdmin aufrufen.' };
     }
+
+    // Als Monteur einrichten
+    const defaultClaims = {
+      role: 'monteur',
+      permissions: ROLES.monteur.permissions
+    };
+
+    const user = await admin.auth().getUser(uid);
+
+    // Custom Claims setzen
+    await admin.auth().setCustomUserClaims(uid, defaultClaims);
+
+    // In Firestore speichern
+    await admin.firestore().collection('users').doc(uid).set({
+      email: user.email,
+      displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
+      role: 'monteur',
+      permissions: ROLES.monteur.permissions,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true, message: 'Benutzer als Monteur eingerichtet', role: 'monteur' };
   } catch (error) {
     console.error('Fehler beim Einrichten des neuen Benutzers:', error);
+    throw new HttpsError('internal', error.message);
   }
 });
 
