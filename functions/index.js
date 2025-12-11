@@ -1,5 +1,5 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const functions = require('firebase-functions');
+const { user } = require('firebase-functions/v1/auth');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -123,7 +123,7 @@ exports.setupFirstAdmin = onCall(async (request) => {
  * Trigger: Neue Benutzer automatisch als Mitarbeiter einrichten
  * Verwendet onCreate (v1) statt beforeUserCreated - keine Identity Platform nötig
  */
-exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
+exports.onUserCreate = user().onCreate(async (userRecord) => {
   try {
     // Prüfen ob bereits Admins existieren
     const existingAdmins = await admin.firestore()
@@ -139,12 +139,12 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
       };
 
       // Custom Claims setzen
-      await admin.auth().setCustomUserClaims(user.uid, defaultClaims);
+      await admin.auth().setCustomUserClaims(userRecord.uid, defaultClaims);
 
       // In Firestore speichern
-      await admin.firestore().collection('users').doc(user.uid).set({
-        email: user.email,
-        displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
+      await admin.firestore().collection('users').doc(userRecord.uid).set({
+        email: userRecord.email,
+        displayName: userRecord.displayName || (userRecord.email ? userRecord.email.split('@')[0] : 'User'),
         role: 'monteur',
         permissions: ROLES.monteur.permissions,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
