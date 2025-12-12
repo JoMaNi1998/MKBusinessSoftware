@@ -212,6 +212,20 @@ const InvoiceConfigurator = () => {
           offerNumber: offer.offerNumber
         });
 
+        // selectedServices und serviceQuantities aus Angebot-Items rekonstruieren
+        const reconstructedServices = {};
+        const reconstructedQuantities = {};
+
+        (offer.items || []).forEach(item => {
+          if (item.category && item.serviceID) {
+            reconstructedServices[item.category] = item.serviceID;
+            reconstructedQuantities[item.category] = item.quantity || 1;
+          }
+        });
+
+        setSelectedServices(prev => ({ ...prev, ...reconstructedServices }));
+        setServiceQuantities(prev => ({ ...prev, ...reconstructedQuantities }));
+
         showNotification(`Daten aus Angebot ${offer.offerNumber} übernommen`, 'info');
       }
     }
@@ -234,6 +248,20 @@ const InvoiceConfigurator = () => {
           offerID: existingInvoice.offerID,
           offerNumber: existingInvoice.offerNumber
         });
+
+        // selectedServices und serviceQuantities aus Items rekonstruieren
+        const reconstructedServices = {};
+        const reconstructedQuantities = {};
+
+        (existingInvoice.items || []).forEach(item => {
+          if (item.category && item.serviceID) {
+            reconstructedServices[item.category] = item.serviceID;
+            reconstructedQuantities[item.category] = item.quantity || 1;
+          }
+        });
+
+        setSelectedServices(prev => ({ ...prev, ...reconstructedServices }));
+        setServiceQuantities(prev => ({ ...prev, ...reconstructedQuantities }));
       }
     } else if (!fromOfferId) {
       // Defaults für neue Rechnung

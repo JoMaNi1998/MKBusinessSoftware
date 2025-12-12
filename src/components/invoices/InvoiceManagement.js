@@ -568,16 +568,18 @@ const InvoiceManagement = () => {
                               />
                               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
                                 <div className="py-1">
-                                  <button
-                                    onClick={() => {
-                                      handleEditInvoice(invoice);
-                                      setShowActionsMenu(null);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                                  >
-                                    <Edit className="h-4 w-4 mr-3" />
-                                    Bearbeiten
-                                  </button>
+                                  {!invoice.offerID && (
+                                    <button
+                                      onClick={() => {
+                                        handleEditInvoice(invoice);
+                                        setShowActionsMenu(null);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                    >
+                                      <Edit className="h-4 w-4 mr-3" />
+                                      Bearbeiten
+                                    </button>
+                                  )}
                                   {invoice.status === INVOICE_STATUS.SENT && (
                                     <button
                                       onClick={() => handleStatusChange(invoice, INVOICE_STATUS.PAID)}

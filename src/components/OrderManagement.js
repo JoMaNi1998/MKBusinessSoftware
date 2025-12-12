@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Check, X, Package, AlertTriangle, Clock, Plus, Search, Shield, ExternalLink, Settings, Filter } from 'lucide-react';
+import { ShoppingCart, Check, X, Package, AlertTriangle, Clock, Plus, Search, Shield, ExternalLink, Settings, Filter, Euro } from 'lucide-react';
 import { useMaterials } from '../context/MaterialContext';
 import { useNotification } from '../context/NotificationContext';
 import { FirebaseService } from '../services/firebaseService';
@@ -12,13 +12,13 @@ const OrderManagement = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [listSearchTerm, setListSearchTerm] = useState('');
-  const [editingOrderQty, setEditingOrderQty] = useState(null);
-  const [tempOrderQty, setTempOrderQty] = useState('');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState({
     material: true,
     stock: true,
     heatStock: true,
+    itemsPerUnit: true,
+    price: true,
     orderQuantity: true,
     status: true,
     link: true,
@@ -29,6 +29,21 @@ const OrderManagement = () => {
     status: 'alle'
   });
   const [activeColumnFilter, setActiveColumnFilter] = useState(null);
+
+  // State für Einzelbestell-Modal
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [orderModalMaterial, setOrderModalMaterial] = useState(null);
+  const [orderModalQty, setOrderModalQty] = useState('');
+  const [orderModalPrice, setOrderModalPrice] = useState('');
+  const [orderModalTotalPrice, setOrderModalTotalPrice] = useState('');
+  const [orderModalPriceMode, setOrderModalPriceMode] = useState('unit'); // 'unit' oder 'total'
+  const [orderModalIsAdditional, setOrderModalIsAdditional] = useState(false);
+
+  // State für Sammelbestell-Modal
+  const [showBulkOrderModal, setShowBulkOrderModal] = useState(false);
+  const [bulkOrderItems, setBulkOrderItems] = useState([]);
+  const [bulkPriceMode, setBulkPriceMode] = useState('unit'); // 'unit' oder 'total'
+
 
   // Materialien mit Status "niedrig", "nachbestellen" oder "bestellt" laden (ausgenommen: excludeFromAutoOrder bei positiven Beständen)
   // Bei bereits bestellten Materialien mit zusätzlichem Bedarf: Separate Zeile für Nachbestellung
@@ -85,89 +100,240 @@ const OrderManagement = () => {
     setOrderList(result);
   }, [materials]);
 
-  // Inline-Bearbeitung für Bestellmenge
-  const handleOrderQtyEdit = (materialId, currentQty) => {
-    setEditingOrderQty(materialId);
-    setTempOrderQty(String(currentQty || ''));
+  // Einzelbestell-Modal öffnen
+  const openOrderModal = (material, isAdditional = false) => {
+    const defaultQty = isAdditional
+      ? material._displayQuantity
+      : (material.excludeFromAutoOrder ? Math.abs(material.stock || 0) : (material.orderQuantity || 0));
+
+    const unitPrice = material.price !== undefined && material.price !== '' ? String(material.price) : '';
+    const qty = defaultQty || 0;
+    const totalPrice = unitPrice && qty ? String((parseFloat(String(unitPrice).replace(',', '.')) * qty).toFixed(2).replace('.', ',')) : '';
+
+    setOrderModalMaterial(material);
+    setOrderModalQty(String(defaultQty));
+    setOrderModalPrice(unitPrice);
+    setOrderModalTotalPrice(totalPrice);
+    setOrderModalPriceMode('unit');
+    setOrderModalIsAdditional(isAdditional);
+    setShowOrderModal(true);
   };
 
-  const handleOrderQtyCancel = () => {
-    setEditingOrderQty(null);
-    setTempOrderQty('');
+  // Einzelbestell-Modal schließen
+  const closeOrderModal = () => {
+    setShowOrderModal(false);
+    setOrderModalMaterial(null);
+    setOrderModalQty('');
+    setOrderModalPrice('');
+    setOrderModalTotalPrice('');
+    setOrderModalPriceMode('unit');
+    setOrderModalIsAdditional(false);
   };
 
-  const handleOrderQtySave = async (materialId) => {
-    try {
-      const qtyString = String(tempOrderQty || '').trim();
-      if (qtyString === '') {
-        setEditingOrderQty(null);
-        setTempOrderQty('');
-        return;
+  // Berechnung bei Änderung der Menge im Einzelbestell-Modal
+  const handleOrderModalQtyChange = (newQty) => {
+    setOrderModalQty(newQty);
+    const qty = parseInt(newQty, 10);
+    if (!isNaN(qty) && qty > 0) {
+      if (orderModalPriceMode === 'unit' && orderModalPrice) {
+        const unitPrice = parseFloat(orderModalPrice.replace(',', '.'));
+        if (!isNaN(unitPrice)) {
+          setOrderModalTotalPrice((unitPrice * qty).toFixed(2).replace('.', ','));
+        }
+      } else if (orderModalPriceMode === 'total' && orderModalTotalPrice) {
+        const totalPrice = parseFloat(orderModalTotalPrice.replace(',', '.'));
+        if (!isNaN(totalPrice)) {
+          setOrderModalPrice((totalPrice / qty).toFixed(2).replace('.', ','));
+        }
       }
-
-      const qtyValue = parseInt(qtyString, 10);
-      if (isNaN(qtyValue) || qtyValue < 0) {
-        showNotification('Bitte geben Sie eine gültige Menge ein', 'error');
-        return;
-      }
-
-      const material = materials.find(m => m.id === materialId);
-      if (material) {
-        await updateMaterial({
-          ...material,
-          orderQuantity: qtyValue
-        });
-        showNotification('Bestellmenge erfolgreich aktualisiert', 'success');
-      } else {
-        showNotification('Material nicht gefunden', 'error');
-        return;
-      }
-
-      setEditingOrderQty(null);
-      setTempOrderQty('');
-    } catch (error) {
-      console.error('Fehler beim Speichern der Bestellmenge:', error);
-      showNotification('Fehler beim Aktualisieren der Bestellmenge', 'error');
     }
   };
 
-  // Material als bestellt markieren (mit bestellter Menge)
-  // Wenn isAdditional=true, wird die zusätzliche Menge zur bestehenden Bestellung hinzugefügt
-  const markAsOrdered = async (materialId, isAdditional = false, additionalQty = 0) => {
+  // Berechnung bei Änderung des Stückpreises
+  const handleOrderModalUnitPriceChange = (newPrice) => {
+    setOrderModalPrice(newPrice);
+    const qty = parseInt(orderModalQty, 10);
+    const unitPrice = parseFloat(newPrice.replace(',', '.'));
+    if (!isNaN(qty) && qty > 0 && !isNaN(unitPrice)) {
+      setOrderModalTotalPrice((unitPrice * qty).toFixed(2).replace('.', ','));
+    }
+  };
+
+  // Berechnung bei Änderung des Gesamtpreises
+  const handleOrderModalTotalPriceChange = (newTotal) => {
+    setOrderModalTotalPrice(newTotal);
+    const qty = parseInt(orderModalQty, 10);
+    const totalPrice = parseFloat(newTotal.replace(',', '.'));
+    if (!isNaN(qty) && qty > 0 && !isNaN(totalPrice)) {
+      setOrderModalPrice((totalPrice / qty).toFixed(2).replace('.', ','));
+    }
+  };
+
+  // Einzelbestellung bestätigen
+  const confirmSingleOrder = async () => {
+    if (!orderModalMaterial) return;
+
+    const qtyValue = parseInt(orderModalQty, 10);
+    if (isNaN(qtyValue) || qtyValue <= 0) {
+      showNotification('Bitte geben Sie eine gültige Bestellmenge ein', 'error');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const material = materials.find(m => m.id === materialId);
+      // Preis aktualisieren falls geändert
+      const newPrice = orderModalPrice.trim() !== '' ? parseFloat(orderModalPrice.replace(',', '.')) : null;
+      const priceChanged = newPrice !== null && newPrice !== orderModalMaterial.price;
 
-      if (isAdditional) {
-        // Zusätzliche Bestellung: Erhöhe orderedQuantity
-        const currentOrdered = material?.orderedQuantity || 0;
-        const newTotal = currentOrdered + additionalQty;
+      if (priceChanged) {
+        await updateMaterial({
+          ...orderModalMaterial,
+          price: newPrice
+        });
+      }
 
-        await FirebaseService.updateDocument('materials', materialId, {
+      // Bestellung durchführen
+      if (orderModalIsAdditional) {
+        const currentOrdered = orderModalMaterial.orderedQuantity || 0;
+        const newTotal = currentOrdered + qtyValue;
+
+        await FirebaseService.updateDocument('materials', orderModalMaterial.id, {
           orderedQuantity: newTotal,
           orderDate: new Date(),
           updatedAt: new Date()
         });
 
-        showNotification(`+${additionalQty} Stück nachbestellt (gesamt: ${newTotal})`, 'success');
+        showNotification(`+${qtyValue} Stück nachbestellt (gesamt: ${newTotal})`, 'success');
       } else {
-        // excludeFromAutoOrder = true → Defizit, sonst orderQuantity
-        const orderedQty = material?.excludeFromAutoOrder
-          ? Math.abs(material?.stock || 0)
-          : (material?.orderQuantity || 0);
-
-        await FirebaseService.updateDocument('materials', materialId, {
+        await FirebaseService.updateDocument('materials', orderModalMaterial.id, {
           orderStatus: 'bestellt',
           orderDate: new Date(),
-          orderedQuantity: orderedQty,
+          orderedQuantity: qtyValue,
           updatedAt: new Date()
         });
 
-        showNotification(`${orderedQty} Stück als bestellt markiert`, 'success');
+        showNotification(`${qtyValue} Stück als bestellt markiert`, 'success');
       }
+
+      closeOrderModal();
     } catch (error) {
-      console.error('Fehler beim Markieren als bestellt:', error);
-      showNotification('Fehler beim Aktualisieren', 'error');
+      console.error('Fehler beim Bestellen:', error);
+      showNotification('Fehler beim Bestellen', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Sammelbestell-Modal öffnen
+  const openBulkOrderModal = () => {
+    const lowStockMaterials = materials.filter(m =>
+      m.orderStatus !== 'bestellt' && (
+        m.stock < 0 ||
+        (m.stock <= (m.heatStock || 0) && m.stock > 0 && !m.excludeFromAutoOrder)
+      )
+    );
+
+    if (lowStockMaterials.length === 0) {
+      showNotification('Keine Materialien zu bestellen', 'info');
+      return;
+    }
+
+    const items = lowStockMaterials.map(material => {
+      const qty = material.excludeFromAutoOrder ? Math.abs(material.stock || 0) : (material.orderQuantity || 0);
+      const unitPrice = material.price !== undefined && material.price !== '' ? String(material.price) : '';
+      const totalPrice = unitPrice && qty ? String((parseFloat(String(unitPrice).replace(',', '.')) * qty).toFixed(2).replace('.', ',')) : '';
+      return {
+        material,
+        qty: String(qty),
+        price: unitPrice,
+        totalPrice: totalPrice
+      };
+    });
+
+    setBulkOrderItems(items);
+    setBulkPriceMode('unit');
+    setShowBulkOrderModal(true);
+  };
+
+  // Sammelbestell-Modal schließen
+  const closeBulkOrderModal = () => {
+    setShowBulkOrderModal(false);
+    setBulkOrderItems([]);
+    setBulkPriceMode('unit');
+  };
+
+  // Sammelbestell-Item aktualisieren mit automatischer Berechnung
+  const updateBulkOrderItem = (index, field, value) => {
+    setBulkOrderItems(prev => {
+      const newItems = [...prev];
+      const item = { ...newItems[index] };
+      item[field] = value;
+
+      const qty = parseInt(item.qty, 10);
+
+      if (field === 'qty' && !isNaN(qty) && qty > 0) {
+        if (bulkPriceMode === 'unit' && item.price) {
+          const unitPrice = parseFloat(item.price.replace(',', '.'));
+          if (!isNaN(unitPrice)) {
+            item.totalPrice = (unitPrice * qty).toFixed(2).replace('.', ',');
+          }
+        } else if (bulkPriceMode === 'total' && item.totalPrice) {
+          const totalPrice = parseFloat(item.totalPrice.replace(',', '.'));
+          if (!isNaN(totalPrice)) {
+            item.price = (totalPrice / qty).toFixed(2).replace('.', ',');
+          }
+        }
+      } else if (field === 'price' && !isNaN(qty) && qty > 0) {
+        const unitPrice = parseFloat(value.replace(',', '.'));
+        if (!isNaN(unitPrice)) {
+          item.totalPrice = (unitPrice * qty).toFixed(2).replace('.', ',');
+        }
+      } else if (field === 'totalPrice' && !isNaN(qty) && qty > 0) {
+        const totalPrice = parseFloat(value.replace(',', '.'));
+        if (!isNaN(totalPrice)) {
+          item.price = (totalPrice / qty).toFixed(2).replace('.', ',');
+        }
+      }
+
+      newItems[index] = item;
+      return newItems;
+    });
+  };
+
+  // Sammelbestellung bestätigen
+  const confirmBulkOrder = async () => {
+    setIsLoading(true);
+    try {
+      const updatePromises = bulkOrderItems.map(async (item) => {
+        const qtyValue = parseInt(item.qty, 10);
+        if (isNaN(qtyValue) || qtyValue <= 0) return;
+
+        // Preis aktualisieren falls geändert
+        const newPrice = item.price.trim() !== '' ? parseFloat(item.price.replace(',', '.')) : null;
+        const priceChanged = newPrice !== null && newPrice !== item.material.price;
+
+        if (priceChanged) {
+          await updateMaterial({
+            ...item.material,
+            price: newPrice
+          });
+        }
+
+        // Bestellung durchführen
+        return FirebaseService.updateDocument('materials', item.material.id, {
+          orderStatus: 'bestellt',
+          orderDate: new Date(),
+          orderedQuantity: qtyValue,
+          updatedAt: new Date()
+        });
+      });
+
+      await Promise.all(updatePromises);
+      showNotification(`${bulkOrderItems.length} Materialien als bestellt markiert`, 'success');
+      closeBulkOrderModal();
+    } catch (error) {
+      console.error('Fehler bei der Sammelbestellung:', error);
+      showNotification('Fehler bei der Sammelbestellung', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -193,49 +359,7 @@ const OrderManagement = () => {
     }
   };
 
-  // Alle niedrigen/negativen Materialien auf einmal bestellen (ausgenommen: excludeFromAutoOrder bei positiven Beständen)
-  const orderAllLowStock = async () => {
-    const lowStockMaterials = materials.filter(m =>
-      m.orderStatus !== 'bestellt' && (
-        // Negativer Bestand = immer einschließen
-        m.stock < 0 ||
-        // Niedriger Bestand und nicht ausgeschlossen
-        (m.stock <= (m.heatStock || 0) && m.stock > 0 && !m.excludeFromAutoOrder)
-      )
-    );
-
-    if (lowStockMaterials.length === 0) {
-      showNotification('Keine Materialien zu bestellen', 'info');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const updatePromises = lowStockMaterials.map(material => {
-        // excludeFromAutoOrder = true → Defizit, sonst orderQuantity
-        const orderedQty = material.excludeFromAutoOrder
-          ? Math.abs(material.stock || 0)
-          : (material.orderQuantity || 0);
-        return FirebaseService.updateDocument('materials', material.id, {
-          orderStatus: 'bestellt',
-          orderDate: new Date(),
-          orderedQuantity: orderedQty,
-          updatedAt: new Date()
-        });
-      });
-
-      await Promise.all(updatePromises);
-      showNotification(`${lowStockMaterials.length} Materialien als bestellt markiert`, 'success');
-    } catch (error) {
-      console.error('Fehler beim Massenbestellung:', error);
-      showNotification('Fehler bei der Massenbestellung', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const getStatusColor = (material) => {
-    // Verwende _displayType für die Anzeige
     switch (material._displayType) {
       case 'ordered':
         return 'bg-blue-100 text-blue-800';
@@ -251,7 +375,6 @@ const OrderManagement = () => {
   };
 
   const getStatusText = (material) => {
-    // Verwende _displayType für die Anzeige
     switch (material._displayType) {
       case 'ordered':
         return `Bestellt (${material._displayQuantity})`;
@@ -266,11 +389,19 @@ const OrderManagement = () => {
     }
   };
 
+  // Preis formatieren
+  const formatPrice = (price) => {
+    if (price === null || price === undefined || price === '') return '-';
+    return `${Number(price).toFixed(2).replace('.', ',')} €`;
+  };
+
   // Verfügbare Spalten
   const availableColumns = [
     { key: 'material', label: 'Material', required: true },
     { key: 'stock', label: 'Bestand', required: false },
     { key: 'heatStock', label: 'Meldebestand', required: false },
+    { key: 'itemsPerUnit', label: 'Stk/Einheit', required: false },
+    { key: 'price', label: 'Preis', required: false },
     { key: 'orderQuantity', label: 'Bestellmenge', required: true },
     { key: 'status', label: 'Status', required: false },
     { key: 'link', label: 'Link', required: false },
@@ -288,7 +419,11 @@ const OrderManagement = () => {
       const columnPrefs = preferences.find(pref => pref.type === 'orderColumns');
 
       if (columnPrefs && columnPrefs.columns) {
-        setVisibleColumns(columnPrefs.columns);
+        // Merge mit Default-Werten für neue Spalten
+        setVisibleColumns(prev => ({
+          ...prev,
+          ...columnPrefs.columns
+        }));
       }
     } catch (error) {
       console.error('Fehler beim Laden der Spalteneinstellungen:', error);
@@ -361,44 +496,34 @@ const OrderManagement = () => {
     loadColumnPreferences();
   }, []);
 
-  // Material manuell zur Bestellung hinzufügen
-  const addMaterialToOrder = async (materialId) => {
-    setIsLoading(true);
-    try {
-      const material = materials.find(m => m.id === materialId);
-      // excludeFromAutoOrder = true → Defizit, sonst orderQuantity
-      const orderedQty = material?.excludeFromAutoOrder
-        ? Math.abs(material?.stock || 0)
-        : (material?.orderQuantity || 0);
-
-      await FirebaseService.updateDocument('materials', materialId, {
-        orderStatus: 'bestellt',
-        orderDate: new Date(),
-        orderedQuantity: orderedQty,
-        updatedAt: new Date()
-      });
-
-      showNotification(`Material zur Bestellung hinzugefügt (${orderedQty} Stück)`, 'success');
+  // Material manuell zur Bestellung hinzufügen (öffnet Modal)
+  const addMaterialToOrder = (materialId) => {
+    const material = materials.find(m => m.id === materialId);
+    if (material) {
+      // Material wie ein orderList-Item behandeln
+      const mockOrderItem = {
+        ...material,
+        _displayType: 'needed',
+        _displayQuantity: material.orderQuantity || 0
+      };
+      openOrderModal(mockOrderItem, false);
       setShowAddModal(false);
       setSearchTerm('');
-    } catch (error) {
-      console.error('Fehler beim Hinzufügen zur Bestellung:', error);
-      showNotification('Fehler beim Hinzufügen zur Bestellung', 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Verfügbare Materialien für manuelle Bestellung (nicht bereits bestellt)
-  const availableMaterials = materials.filter(m => 
-    m.orderStatus !== 'bestellt' && 
-    (searchTerm === '' || 
+  const availableMaterials = materials.filter(m =>
+    m.orderStatus !== 'bestellt' &&
+    (searchTerm === '' ||
      m.materialID.toLowerCase().includes(searchTerm.toLowerCase()) ||
      m.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
      m.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const lowStockCount = materials.filter(m => m.stock <= (m.heatStock || 0) && m.stock > 0 && m.orderStatus !== 'bestellt' && !m.excludeFromAutoOrder).length;
+  const negativeStockCount = materials.filter(m => m.stock < 0 && m.orderStatus !== 'bestellt').length;
+  const toOrderCount = lowStockCount + negativeStockCount;
   const orderedCount = materials.filter(m => m.orderStatus === 'bestellt').length;
   const excludedLowStockCount = materials.filter(m => m.stock <= (m.heatStock || 0) && m.stock > 0 && m.excludeFromAutoOrder && m.orderStatus !== 'bestellt').length;
 
@@ -438,12 +563,12 @@ const OrderManagement = () => {
             <span>Material hinzufügen</span>
           </button>
           <button
-            onClick={orderAllLowStock}
-            disabled={isLoading || lowStockCount === 0}
+            onClick={openBulkOrderModal}
+            disabled={isLoading || toOrderCount === 0}
             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
             <ShoppingCart className="h-4 w-4" />
-            <span>Alle niedrigen bestellen ({lowStockCount})</span>
+            <span>Alle niedrigen bestellen ({toOrderCount})</span>
           </button>
         </div>
       </div>
@@ -454,7 +579,7 @@ const OrderManagement = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Zu bestellen</p>
-              <p className="text-2xl font-bold text-orange-600">{lowStockCount}</p>
+              <p className="text-2xl font-bold text-orange-600">{toOrderCount}</p>
             </div>
             <AlertTriangle className="h-8 w-8 text-orange-600" />
           </div>
@@ -544,7 +669,7 @@ const OrderManagement = () => {
                   </div>
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <p className="text-xs text-gray-500">
-                      💾 Einstellungen werden automatisch in Firebase gespeichert
+                      Einstellungen werden automatisch gespeichert
                     </p>
                   </div>
                 </div>
@@ -577,6 +702,16 @@ const OrderManagement = () => {
                   {visibleColumns.heatStock && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Meldebestand
+                    </th>
+                  )}
+                  {visibleColumns.itemsPerUnit && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stk/Einheit
+                    </th>
+                  )}
+                  {visibleColumns.price && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Preis
                     </th>
                   )}
                   {visibleColumns.orderQuantity && (
@@ -627,8 +762,8 @@ const OrderManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredOrderList.map((material) => (
-                  <tr key={material.id} className="hover:bg-gray-50">
+                {filteredOrderList.map((material, index) => (
+                  <tr key={`${material.id}-${material._displayType}-${index}`} className="hover:bg-gray-50">
                     {visibleColumns.material && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
@@ -643,7 +778,7 @@ const OrderManagement = () => {
                     )}
                     {visibleColumns.stock && (
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className={`text-sm ${material.stock < 0 ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
                           {material.stock}
                         </div>
                       </td>
@@ -655,42 +790,25 @@ const OrderManagement = () => {
                         </div>
                       </td>
                     )}
+                    {visibleColumns.itemsPerUnit && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {material.itemsPerUnit || '-'}
+                        </div>
+                      </td>
+                    )}
+                    {visibleColumns.price && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {formatPrice(material.price)}
+                        </div>
+                      </td>
+                    )}
                     {visibleColumns.orderQuantity && (
-                      <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        {editingOrderQty === material.id ? (
-                          <div className="relative z-50">
-                            <input
-                              type="number"
-                              value={tempOrderQty}
-                              onChange={(e) => setTempOrderQty(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleOrderQtySave(material.id);
-                                } else if (e.key === 'Escape') {
-                                  handleOrderQtyCancel();
-                                }
-                              }}
-                              onBlur={() => handleOrderQtySave(material.id)}
-                              className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                              placeholder="0"
-                              min="0"
-                              autoFocus
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            className="cursor-pointer hover:bg-blue-50 hover:border hover:border-blue-200 px-2 py-1 rounded transition-all duration-200"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOrderQtyEdit(material.id, material.orderQuantity);
-                            }}
-                            title="Klicken zum Bearbeiten der Bestellmenge"
-                          >
-                            <span className="text-sm font-medium text-gray-900 hover:text-blue-700">
-                              {material._displayQuantity}
-                            </span>
-                          </div>
-                        )}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {material._displayQuantity}
+                        </div>
                       </td>
                     )}
                     {visibleColumns.status && (
@@ -730,7 +848,7 @@ const OrderManagement = () => {
                           </button>
                         ) : material._displayType === 'additional' ? (
                           <button
-                            onClick={() => markAsOrdered(material.id, true, material._displayQuantity)}
+                            onClick={() => openOrderModal(material, true)}
                             disabled={isLoading}
                             className="text-blue-600 hover:text-blue-900 disabled:opacity-50 flex items-center space-x-1"
                           >
@@ -739,7 +857,7 @@ const OrderManagement = () => {
                           </button>
                         ) : (
                           <button
-                            onClick={() => markAsOrdered(material.id)}
+                            onClick={() => openOrderModal(material, false)}
                             disabled={isLoading}
                             className="text-blue-600 hover:text-blue-900 disabled:opacity-50 flex items-center space-x-1"
                           >
@@ -787,6 +905,9 @@ const OrderManagement = () => {
                     Meldebestand
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Stk/Einheit
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Preis
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -822,7 +943,12 @@ const OrderManagement = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {material.price ? `${material.price} €` : 'Nicht angegeben'}
+                        {material.itemsPerUnit || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {formatPrice(material.price)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -906,7 +1032,7 @@ const OrderManagement = () => {
                       <div className="font-medium text-gray-900">{material.materialID}</div>
                       <div className="text-sm text-gray-500">{material.description}</div>
                       <div className="text-xs text-gray-400">
-                        {material.manufacturer} • Bestand: {material.stock}
+                        {material.manufacturer} • Bestand: {material.stock} • Preis: {formatPrice(material.price)}
                       </div>
                     </div>
                     <button
@@ -919,6 +1045,327 @@ const OrderManagement = () => {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Einzelbestell-Modal */}
+      {showOrderModal && orderModalMaterial && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 !m-0 !top-0">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                {orderModalIsAdditional ? 'Nachbestellung bestätigen' : 'Bestellung bestätigen'}
+              </h2>
+              <button
+                onClick={closeOrderModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Material Info */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="font-medium text-gray-900">{orderModalMaterial.description}</div>
+                <div className="text-sm text-gray-500">{orderModalMaterial.materialID}</div>
+                {orderModalMaterial.itemsPerUnit && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    Stück pro Einheit: {orderModalMaterial.itemsPerUnit}
+                  </div>
+                )}
+              </div>
+
+              {/* Bestellmenge */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bestellmenge
+                </label>
+                <input
+                  type="number"
+                  value={orderModalQty}
+                  onChange={(e) => handleOrderModalQtyChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="0"
+                  min="1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Diese Menge gilt nur für diese Bestellung
+                </p>
+              </div>
+
+              {/* Preiseingabe-Modus Toggle */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Preiseingabe
+                </label>
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setOrderModalPriceMode('unit')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
+                      orderModalPriceMode === 'unit'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Stückpreis
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOrderModalPriceMode('total')}
+                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors border-l border-gray-300 ${
+                      orderModalPriceMode === 'total'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Gesamtpreis
+                  </button>
+                </div>
+              </div>
+
+              {/* Preiseingabe basierend auf Modus */}
+              {orderModalPriceMode === 'unit' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Stückpreis (€)
+                  </label>
+                  <div className="relative">
+                    <Euro className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <input
+                      type="text"
+                      value={orderModalPrice}
+                      onChange={(e) => handleOrderModalUnitPriceChange(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="0,00"
+                    />
+                  </div>
+                  {orderModalTotalPrice && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      Gesamtpreis: <span className="font-medium">{orderModalTotalPrice} €</span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Gesamtpreis der Bestellung (€)
+                  </label>
+                  <div className="relative">
+                    <Euro className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <input
+                      type="text"
+                      value={orderModalTotalPrice}
+                      onChange={(e) => handleOrderModalTotalPriceChange(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      placeholder="0,00"
+                    />
+                  </div>
+                  {orderModalPrice && (
+                    <p className="text-sm text-green-600 mt-2">
+                      Berechneter Stückpreis: <span className="font-medium">{orderModalPrice} €</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <p className="text-xs text-amber-600">
+                Der Stückpreis wird permanent für das Material gespeichert
+              </p>
+            </div>
+
+            {/* Aktionen */}
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={closeOrderModal}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={confirmSingleOrder}
+                disabled={isLoading}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center space-x-2"
+              >
+                <Check className="h-4 w-4" />
+                <span>{orderModalIsAdditional ? 'Nachbestellen' : 'Bestellen'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sammelbestell-Modal */}
+      {showBulkOrderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 !m-0 !top-0">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                Sammelbestellung bestätigen ({bulkOrderItems.length} Materialien)
+              </h2>
+              <button
+                onClick={closeBulkOrderModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm text-gray-600">
+                Überprüfen und passen Sie die Bestellmengen und Preise an.
+              </div>
+              {/* Preiseingabe-Modus Toggle */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Preiseingabe:</span>
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setBulkPriceMode('unit')}
+                    className={`px-3 py-1 text-sm font-medium transition-colors ${
+                      bulkPriceMode === 'unit'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Stückpreis
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkPriceMode('total')}
+                    className={`px-3 py-1 text-sm font-medium transition-colors border-l border-gray-300 ${
+                      bulkPriceMode === 'total'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Gesamtpreis
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabelle */}
+            <div className="flex-1 overflow-auto border border-gray-200 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stk/Einheit</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-28">Menge</th>
+                    {bulkPriceMode === 'unit' ? (
+                      <>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Stückpreis (€)</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Gesamt</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Gesamtpreis (€)</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Stückpreis</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {bulkOrderItems.map((item, index) => {
+                    const qty = parseInt(item.qty || 0, 10);
+                    const unitPrice = parseFloat((item.price || '0').replace(',', '.'));
+                    const total = qty * unitPrice;
+                    return (
+                      <tr key={item.material.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-gray-900">{item.material.description}</div>
+                          <div className="text-xs text-gray-500">{item.material.materialID}</div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {item.material.itemsPerUnit || '-'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            value={item.qty}
+                            onChange={(e) => updateBulkOrderItem(index, 'qty', e.target.value)}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            min="1"
+                          />
+                        </td>
+                        {bulkPriceMode === 'unit' ? (
+                          <>
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={item.price}
+                                onChange={(e) => updateBulkOrderItem(index, 'price', e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                placeholder="0,00"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {formatPrice(total)}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-3">
+                              <input
+                                type="text"
+                                value={item.totalPrice || ''}
+                                onChange={(e) => updateBulkOrderItem(index, 'totalPrice', e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                placeholder="0,00"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-sm text-green-600">
+                              {item.price ? `${item.price} €` : '-'}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-gray-50">
+                  <tr>
+                    <td colSpan="4" className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                      Gesamtsumme:
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                      {formatPrice(
+                        bulkOrderItems.reduce((sum, item) => {
+                          const qty = parseInt(item.qty || 0, 10);
+                          const price = parseFloat((item.price || '0').replace(',', '.'));
+                          return sum + (qty * price);
+                        }, 0)
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="text-xs text-amber-600 mt-3">
+              Hinweis: Der Stückpreis wird permanent für die jeweiligen Materialien gespeichert.
+            </div>
+
+            {/* Aktionen */}
+            <div className="flex justify-end space-x-3 mt-4">
+              <button
+                onClick={closeBulkOrderModal}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={confirmBulkOrder}
+                disabled={isLoading}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center space-x-2"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                <span>Alle bestellen</span>
+              </button>
             </div>
           </div>
         </div>

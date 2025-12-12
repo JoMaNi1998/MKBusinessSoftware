@@ -11,6 +11,8 @@ export const useNotification = () => {
   return context;
 };
 
+let notificationCounter = 0;
+
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const timeoutRefs = useRef(new Map()); // Speichert Timeout-IDs pro Notification
@@ -25,7 +27,8 @@ export const NotificationProvider = ({ children }) => {
   }, []);
 
   const showNotification = useCallback((message, type = 'success', duration = 3000) => {
-    const id = Date.now();
+    notificationCounter += 1;
+    const id = `${Date.now()}-${notificationCounter}`;
     const notification = {
       id,
       message,

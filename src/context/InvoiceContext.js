@@ -188,33 +188,28 @@ export const InvoiceProvider = ({ children }) => {
         notes = `Schlussrechnung (${invoicePercent}%) zu Angebot ${offer.offerNumber}`;
       }
 
-      const taxAmount = invoiceGross - invoiceNet;
+      const taxAmount = offerGrossTotal - offerNetTotal;
 
-      const invoiceItems = [{
-        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        position: 1,
-        type: 'summary',
-        shortText: invoiceType === INVOICE_TYPE.DEPOSIT
-          ? `Anzahlung ${depositPercent}% gemäß Angebot ${offer.offerNumber}`
-          : `Schlussrechnung ${invoicePercent}% gemäß Angebot ${offer.offerNumber}`,
-        longText: invoiceType === INVOICE_TYPE.FINAL && depositInvoice
-          ? `Gesamtbetrag: ${formatCurrency(offerGrossTotal)} - Anzahlung (${depositPercent}%): ${formatCurrency(depositInvoice.totals?.grossTotal || offerGrossTotal * depositPercent / 100)} = Restbetrag`
-          : `Bezugnehmend auf Angebot ${offer.offerNumber} vom ${formatDateSimple(offer.createdAt)}`,
-        quantity: 1,
-        unit: 'psch',
-        unitPriceNet: invoiceNet,
-        totalNet: invoiceNet,
-        discount: 0
-      }];
+      // Alle Positionen aus dem Angebot kopieren mit VOLLEM Preis (100%)
+      const invoiceItems = (offer.items || []).map((item, index) => ({
+        ...item,
+        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`
+        // KEINE prozentuale Anpassung der Preise - voller Betrag wird angezeigt
+      }));
 
+      // Totals: Voller Betrag aus Angebot, aber mit Anzahlungs-/Schlussrechnungs-Infos
       const invoiceTotals = {
-        subtotalNet: invoiceNet,
-        discountPercent: 0,
-        discountAmount: 0,
-        netTotal: invoiceNet,
+        subtotalNet: offerNetTotal,
+        discountPercent: offer.totals?.discountPercent || 0,
+        discountAmount: offer.totals?.discountAmount || 0,
+        netTotal: offerNetTotal,
         taxRate: taxRate,
         taxAmount: taxAmount,
-        grossTotal: invoiceGross
+        grossTotal: offerGrossTotal,
+        // Anzahlungs-/Schlussrechnungs-Infos
+        invoicePercent: invoicePercent,
+        depositAmount: invoiceType === INVOICE_TYPE.DEPOSIT ? 0 : (depositInvoice?.totals?.finalAmount || offerGrossTotal * depositPercent / 100),
+        finalAmount: invoiceGross  // Der tatsächlich zu zahlende Betrag
       };
 
       const invoiceData = {
