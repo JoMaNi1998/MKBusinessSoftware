@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Package, User, Plus, Minus, Search, Building } from 'lucide-react';
+import { X, Save, Package, User, Plus, Minus, Search, Building, QrCode } from 'lucide-react';
 import { useMaterials } from '../context/MaterialContext';
 import { useCustomers } from '../context/CustomerContext';
 import { useProjects } from '../context/ProjectContext';
 import { useNotification } from '../context/NotificationContext';
 import { useBookings } from '../context/BookingContext';
 import BaseModal from './BaseModal';
+import QRScannerModal from './QRScannerModal';
 
 // Konstante für Lagerbuchung (Wareneingang ohne Kunde)
 const WAREHOUSE_BOOKING = 'Lagerbuchung';
@@ -23,6 +24,7 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
   const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [errors, setErrors] = useState({});
+  const [showScanner, setShowScanner] = useState(false);
 
   const filteredMaterials = materials.filter(material => {
     return material.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -171,6 +173,24 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
     }
   };
 
+  // QR-Code Scan Handler
+  const handleQRScan = (scannedCode) => {
+    // Suche Material anhand der gescannten Material-ID
+    const material = materials.find(m => m.materialID === scannedCode);
+
+    if (material) {
+      // Prüfen ob bereits hinzugefügt
+      if (selectedMaterials.find(item => item.materialId === material.id)) {
+        showNotification(`${material.description} ist bereits in der Liste`, 'warning');
+      } else {
+        addMaterial(material.id);
+        showNotification(`${material.description} hinzugefügt`, 'success');
+      }
+    } else {
+      showNotification(`Material "${scannedCode}" nicht gefunden`, 'error');
+    }
+  };
+
   const removeMaterial = (materialId) => {
     setSelectedMaterials(prev => prev.filter(item => item.materialId !== materialId));
   };
@@ -215,6 +235,7 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
   );
 
   return (
+    <>
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
@@ -304,15 +325,26 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Material hinzufügen
             </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Material suchen..."
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Material suchen..."
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                title="QR-Code scannen"
+              >
+                <QrCode className="h-5 w-5" />
+                <span className="hidden sm:inline">Scannen</span>
+              </button>
             </div>
           </div>
 
@@ -417,6 +449,14 @@ const BookingModal = ({ isOpen, onClose, type = 'Ausgang' }) => {
 
         </form>
     </BaseModal>
+
+    {/* QR-Code Scanner Modal */}
+    <QRScannerModal
+      isOpen={showScanner}
+      onClose={() => setShowScanner(false)}
+      onScan={handleQRScan}
+    />
+    </>
   );
 };
 
