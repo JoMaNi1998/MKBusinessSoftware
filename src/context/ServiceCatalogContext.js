@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import { ServiceCatalogService } from '../services/firebaseService';
 import { useCalculation } from './CalculationContext';
 import { useMaterials } from './MaterialContext';
+import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 
 const ServiceCatalogContext = createContext();
 
@@ -39,146 +40,91 @@ export const SERVICE_UNITS = [
 ];
 
 export const ServiceCatalogProvider = ({ children }) => {
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Firebase Real-time Listener mit Custom Hook
+  const {
+    data: services,
+    loading: listenerLoading,
+    error: listenerError
+  } = useFirebaseListener(ServiceCatalogService.subscribeToServices);
 
-  const { calculateServicePosition, settings: calcSettings } = useCalculation();
+  // CRUD Operations Hook
+  const crud = useFirebaseCRUD();
+
+  // Kombinierter Loading-State
+  const loading = listenerLoading || crud.loading;
+  const error = listenerError || crud.error;
+
+  const { calculateServicePosition } = useCalculation();
   const { materials } = useMaterials();
-
-  // Firebase Real-time Listener
-  useEffect(() => {
-    let unsubscribe;
-
-    const setupListener = async () => {
-      try {
-        setLoading(true);
-        unsubscribe = ServiceCatalogService.subscribeToServices((servicesData) => {
-          setServices(servicesData || []);
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error('Error setting up services listener:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-
-    setupListener();
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
 
   // Leistungsposition hinzufügen
   const addService = useCallback(async (serviceData) => {
-    try {
-      setLoading(true);
+    // Preise berechnen (mit individuellem Materialaufschlag)
+    const calculatedPrices = calculateServicePosition(
+      serviceData.materials || [],
+      serviceData.labor || [],
+      materials,
+      serviceData.materialMarkup ?? 15
+    );
 
-      // Preise berechnen (mit individuellem Materialaufschlag)
-      const calculatedPrices = calculateServicePosition(
-        serviceData.materials || [],
-        serviceData.labor || [],
-        materials,
-        serviceData.materialMarkup ?? 15
-      );
+    const newService = {
+      ...serviceData,
+      calculatedPrices,
+      isActive: serviceData.isActive !== false,
+      isDefaultPosition: serviceData.isDefaultPosition || false,
+      defaultQuantity: serviceData.defaultQuantity || 1,
+      sortOrder: serviceData.sortOrder || 999,
+      materialMarkup: serviceData.materialMarkup ?? 15
+    };
 
-      const newService = {
-        ...serviceData,
-        calculatedPrices,
-        isActive: serviceData.isActive !== false,
-        isDefaultPosition: serviceData.isDefaultPosition || false,
-        defaultQuantity: serviceData.defaultQuantity || 1,
-        sortOrder: serviceData.sortOrder || 999,
-        materialMarkup: serviceData.materialMarkup ?? 15
-      };
-
-      await ServiceCatalogService.addService(newService);
-      return { success: true };
-    } catch (err) {
-      console.error('Error adding service:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  }, [calculateServicePosition, materials]);
+    return crud.execute(ServiceCatalogService.addService, newService);
+  }, [crud, calculateServicePosition, materials]);
 
   // Leistungsposition aktualisieren
   const updateService = useCallback(async (serviceId, serviceData) => {
-    try {
-      setLoading(true);
+    // Preise neu berechnen (mit individuellem Materialaufschlag)
+    const calculatedPrices = calculateServicePosition(
+      serviceData.materials || [],
+      serviceData.labor || [],
+      materials,
+      serviceData.materialMarkup ?? 15
+    );
 
-      // Preise neu berechnen (mit individuellem Materialaufschlag)
-      const calculatedPrices = calculateServicePosition(
-        serviceData.materials || [],
-        serviceData.labor || [],
-        materials,
-        serviceData.materialMarkup ?? 15
-      );
+    const updatedService = {
+      ...serviceData,
+      calculatedPrices,
+      materialMarkup: serviceData.materialMarkup ?? 15
+    };
 
-      const updatedService = {
-        ...serviceData,
-        calculatedPrices,
-        materialMarkup: serviceData.materialMarkup ?? 15
-      };
-
-      await ServiceCatalogService.updateService(serviceId, updatedService);
-      return { success: true };
-    } catch (err) {
-      console.error('Error updating service:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  }, [calculateServicePosition, materials]);
+    return crud.execute(ServiceCatalogService.updateService, serviceId, updatedService);
+  }, [crud, calculateServicePosition, materials]);
 
   // Leistungsposition löschen
   const deleteService = useCallback(async (serviceId) => {
-    try {
-      setLoading(true);
-      await ServiceCatalogService.deleteService(serviceId);
-      return { success: true };
-    } catch (err) {
-      console.error('Error deleting service:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return crud.execute(ServiceCatalogService.deleteService, serviceId);
+  }, [crud]);
 
   // Leistungsposition duplizieren
   const duplicateService = useCallback(async (serviceId) => {
-    try {
-      const originalService = services.find(s => s.id === serviceId);
-      if (!originalService) {
-        throw new Error('Service not found');
-      }
-
-      const { id, createdAt, updatedAt, ...serviceData } = originalService;
-      const duplicatedService = {
-        ...serviceData,
-        name: `${serviceData.name} (Kopie)`,
-        shortText: `${serviceData.shortText} (Kopie)`
-      };
-
-      return addService(duplicatedService);
-    } catch (err) {
-      console.error('Error duplicating service:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
+    const originalService = services.find(s => s.id === serviceId);
+    if (!originalService) {
+      return { success: false, error: 'Service nicht gefunden' };
     }
+
+    const { id, createdAt, updatedAt, ...serviceData } = originalService;
+    const duplicatedService = {
+      ...serviceData,
+      name: `${serviceData.name} (Kopie)`,
+      shortText: `${serviceData.shortText} (Kopie)`
+    };
+
+    return addService(duplicatedService);
   }, [services, addService]);
 
   // Alle Preise neu berechnen (z.B. nach Änderung der Kalkulationseinstellungen)
   const recalculateAllPrices = useCallback(async () => {
     try {
-      setLoading(true);
+      crud.setLoading(true);
 
       for (const service of services) {
         const calculatedPrices = calculateServicePosition(
@@ -197,12 +143,11 @@ export const ServiceCatalogProvider = ({ children }) => {
       return { success: true };
     } catch (err) {
       console.error('Error recalculating prices:', err);
-      setError(err.message);
       return { success: false, error: err.message };
     } finally {
-      setLoading(false);
+      crud.setLoading(false);
     }
-  }, [services, calculateServicePosition, materials]);
+  }, [services, calculateServicePosition, materials, crud]);
 
   // Services nach Kategorie gruppieren
   const getServicesByCategory = useCallback(() => {
@@ -221,10 +166,16 @@ export const ServiceCatalogProvider = ({ children }) => {
   }, [services]);
 
   // Aktive Services
-  const activeServices = services.filter(s => s.isActive !== false);
+  const activeServices = useMemo(() =>
+    services.filter(s => s.isActive !== false),
+    [services]
+  );
 
   // Pflichtpositionen (werden automatisch zu neuen Angeboten hinzugefügt)
-  const defaultServices = services.filter(s => s.isActive !== false && s.isDefaultPosition === true);
+  const defaultServices = useMemo(() =>
+    services.filter(s => s.isActive !== false && s.isDefaultPosition === true),
+    [services]
+  );
 
   const value = {
     services,

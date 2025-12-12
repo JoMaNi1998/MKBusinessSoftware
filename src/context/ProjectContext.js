@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
 import { ProjectService } from '../services/firebaseService';
+import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 
 const ProjectContext = createContext();
 
@@ -12,100 +13,57 @@ export const useProjects = () => {
 };
 
 export const ProjectProvider = ({ children }) => {
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Firebase Real-time Listener mit Custom Hook
+  const {
+    data: projects,
+    loading: listenerLoading,
+    error: listenerError
+  } = useFirebaseListener(ProjectService.subscribeToProjects);
 
-  // Firebase Real-time Listener
-  useEffect(() => {
-    let unsubscribe;
-    
-    const setupListener = async () => {
-      try {
-        setLoading(true);
-        unsubscribe = ProjectService.subscribeToProjects((projectsData) => {
-          setProjects(projectsData);
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error('Error setting up projects listener:', err);
-        setError(err.message);
-        setLoading(false);
-      }
+  // CRUD Operations Hook
+  const crud = useFirebaseCRUD();
+
+  // Kombinierter Loading-State
+  const loading = listenerLoading || crud.loading;
+  const error = listenerError || crud.error;
+
+  // CRUD Operationen mit konsistenter Rückgabe
+  const addProject = useCallback(async (projectData) => {
+    // Eindeutige ID generieren falls nicht vorhanden
+    const projectWithId = {
+      ...projectData,
+      id: projectData.id || `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: projectData.status || 'Aktiv'
     };
 
-    setupListener();
+    return crud.execute(ProjectService.addProject, projectWithId);
+  }, [crud]);
 
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
+  const updateProject = useCallback(async (projectId, projectData) => {
+    return crud.execute(ProjectService.updateProject, projectId, {
+      ...projectData,
+      updatedAt: new Date()
+    });
+  }, [crud]);
 
-  const addProject = async (projectData) => {
-    try {
-      setLoading(true);
-      // Eindeutige ID generieren falls nicht vorhanden
-      const projectWithId = {
-        ...projectData,
-        id: projectData.id || `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        status: projectData.status || 'Aktiv'
-      };
-      
-      const projectId = await ProjectService.addProject(projectWithId);
-      return projectId;
-    } catch (err) {
-      console.error('Error adding project:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const deleteProject = useCallback(async (projectId) => {
+    return crud.execute(ProjectService.deleteProject, projectId);
+  }, [crud]);
 
-  const updateProject = async (projectId, projectData) => {
-    try {
-      setLoading(true);
-      await ProjectService.updateProject(projectId, {
-        ...projectData,
-        updatedAt: new Date()
-      });
-    } catch (err) {
-      console.error('Error updating project:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteProject = async (projectId) => {
-    try {
-      setLoading(true);
-      await ProjectService.deleteProject(projectId);
-    } catch (err) {
-      console.error('Error deleting project:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getProjectsByCustomer = (customerID) => {
+  // Hilfsfunktionen (keine async Operationen)
+  const getProjectsByCustomer = useCallback((customerID) => {
     return projects.filter(project => project.customerID === customerID);
-  };
+  }, [projects]);
 
-  const getActiveProjects = () => {
+  const getActiveProjects = useCallback(() => {
     return projects.filter(project => project.status === 'Aktiv');
-  };
+  }, [projects]);
 
-  const getProjectById = (projectId) => {
+  const getProjectById = useCallback((projectId) => {
     return projects.find(project => project.id === projectId);
-  };
+  }, [projects]);
 
   const value = {
     projects,

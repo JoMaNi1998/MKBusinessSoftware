@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
 import { InvoiceService } from '../services/firebaseService';
 import { useCalculation } from './CalculationContext';
 import { useAuth } from './AuthContext';
+import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 
 const InvoiceContext = createContext();
 
@@ -44,44 +45,60 @@ export const INVOICE_TYPE_LABELS = {
 };
 
 export const InvoiceProvider = ({ children }) => {
-  const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Firebase Real-time Listener mit Custom Hook
+  const {
+    data: invoices,
+    loading: listenerLoading,
+    error: listenerError
+  } = useFirebaseListener(InvoiceService.subscribeToInvoices);
+
+  // CRUD Operations Hook
+  const crud = useFirebaseCRUD();
+
+  // Kombinierter Loading-State
+  const loading = listenerLoading || crud.loading;
+  const error = listenerError || crud.error;
 
   const { calculateOfferTotals, settings: calcSettings } = useCalculation();
   const { user } = useAuth();
 
-  // Firebase Real-time Listener
-  useEffect(() => {
-    let unsubscribe;
+  // Hilfsfunktionen für Formatierung
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount || 0);
+  };
 
-    const setupListener = async () => {
-      try {
-        setLoading(true);
-        unsubscribe = InvoiceService.subscribeToInvoices((invoicesData) => {
-          setInvoices(invoicesData || []);
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error('Error setting up invoices listener:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    };
+  const formatDateSimple = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
+      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return '-';
+    }
+  };
 
-    setupListener();
+  // Prüfen ob für ein Angebot bereits eine Anzahlungsrechnung existiert
+  const hasDepositInvoice = useCallback((offerId) => {
+    return invoices.some(i =>
+      i.offerID === offerId &&
+      i.invoiceType === INVOICE_TYPE.DEPOSIT &&
+      i.status !== INVOICE_STATUS.CANCELLED
+    );
+  }, [invoices]);
 
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
+  // Anzahlungsrechnung für ein Angebot holen
+  const getDepositInvoice = useCallback((offerId) => {
+    return invoices.find(i =>
+      i.offerID === offerId &&
+      i.invoiceType === INVOICE_TYPE.DEPOSIT &&
+      i.status !== INVOICE_STATUS.CANCELLED
+    );
+  }, [invoices]);
 
   // Neue Rechnung erstellen
   const createInvoice = useCallback(async (invoiceData) => {
     try {
-      setLoading(true);
+      crud.setLoading(true);
 
       // Rechnungsnummer generieren
       const invoiceNumber = await InvoiceService.getNextInvoiceNumber();
@@ -89,10 +106,8 @@ export const InvoiceProvider = ({ children }) => {
       // Summen berechnen - oder vorgegebene Totals verwenden (für Anzahlung/Schlussrechnung)
       let totals;
       if (invoiceData.totals && invoiceData.skipTotalsCalculation) {
-        // Bei Anzahlung/Schlussrechnung: vorgegebene Totals verwenden
         totals = invoiceData.totals;
       } else {
-        // Normale Berechnung
         totals = calculateOfferTotals(invoiceData.items || [], invoiceData.discountPercent || 0);
       }
 
@@ -132,30 +147,11 @@ export const InvoiceProvider = ({ children }) => {
       return { success: true, invoiceId: result.id, invoiceNumber };
     } catch (err) {
       console.error('Error creating invoice:', err);
-      setError(err.message);
       return { success: false, error: err.message };
     } finally {
-      setLoading(false);
+      crud.setLoading(false);
     }
-  }, [calculateOfferTotals, calcSettings, user]);
-
-  // Prüfen ob für ein Angebot bereits eine Anzahlungsrechnung existiert
-  const hasDepositInvoice = useCallback((offerId) => {
-    return invoices.some(i =>
-      i.offerID === offerId &&
-      i.invoiceType === INVOICE_TYPE.DEPOSIT &&
-      i.status !== INVOICE_STATUS.CANCELLED
-    );
-  }, [invoices]);
-
-  // Anzahlungsrechnung für ein Angebot holen
-  const getDepositInvoice = useCallback((offerId) => {
-    return invoices.find(i =>
-      i.offerID === offerId &&
-      i.invoiceType === INVOICE_TYPE.DEPOSIT &&
-      i.status !== INVOICE_STATUS.CANCELLED
-    );
-  }, [invoices]);
+  }, [crud, calculateOfferTotals, calcSettings, user]);
 
   // Rechnung aus Angebot erstellen (automatisch Anzahlung oder Schlussrechnung)
   const createInvoiceFromOffer = useCallback(async (offer, forceType = null) => {
@@ -181,23 +177,19 @@ export const InvoiceProvider = ({ children }) => {
       let notes;
 
       if (invoiceType === INVOICE_TYPE.DEPOSIT) {
-        // Anzahlungsrechnung: X% des Gesamtbetrags
         invoicePercent = depositPercent;
         invoiceGross = offerGrossTotal * (depositPercent / 100);
         invoiceNet = offerNetTotal * (depositPercent / 100);
         notes = `Anzahlungsrechnung (${depositPercent}%) zu Angebot ${offer.offerNumber}`;
       } else {
-        // Schlussrechnung: Restbetrag (100% - Anzahlung)
         invoicePercent = 100 - depositPercent;
         invoiceGross = offerGrossTotal * (invoicePercent / 100);
         invoiceNet = offerNetTotal * (invoicePercent / 100);
         notes = `Schlussrechnung (${invoicePercent}%) zu Angebot ${offer.offerNumber}`;
       }
 
-      // MwSt-Betrag berechnen
       const taxAmount = invoiceGross - invoiceNet;
 
-      // Für Anzahlung/Schlussrechnung: Eine Sammelposition erstellen
       const invoiceItems = [{
         id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         position: 1,
@@ -215,7 +207,6 @@ export const InvoiceProvider = ({ children }) => {
         discount: 0
       }];
 
-      // Totals für die Rechnung vorbereiten
       const invoiceTotals = {
         subtotalNet: invoiceNet,
         discountPercent: 0,
@@ -227,154 +218,101 @@ export const InvoiceProvider = ({ children }) => {
       };
 
       const invoiceData = {
-        // Referenz zum Angebot
         offerID: offer.id,
         offerNumber: offer.offerNumber,
-        // Rechnungstyp
         invoiceType,
         invoicePercent,
-        // Referenz zur Anzahlungsrechnung (bei Schlussrechnung)
         depositInvoiceID: invoiceType === INVOICE_TYPE.FINAL ? depositInvoice?.id : null,
         depositInvoiceNumber: invoiceType === INVOICE_TYPE.FINAL ? depositInvoice?.invoiceNumber : null,
         depositAmount: invoiceType === INVOICE_TYPE.FINAL ? (depositInvoice?.totals?.grossTotal || offerGrossTotal * depositPercent / 100) : 0,
-        // Kundendaten übernehmen
         customerID: offer.customerID,
         projectID: offer.projectID,
-        // Positionen
         items: invoiceItems,
-        // Vorberechnete Totals
         totals: invoiceTotals,
-        skipTotalsCalculation: true, // Flag um Neuberechnung zu verhindern
-        // Originale Angebotsdaten für Referenz
+        skipTotalsCalculation: true,
         offerTotals: offer.totals,
         offerDepositPercent: depositPercent,
-        // Notizen
         notes
       };
 
       return createInvoice(invoiceData);
     } catch (err) {
       console.error('Error creating invoice from offer:', err);
-      setError(err.message);
       return { success: false, error: err.message };
     }
-  }, [createInvoice, hasDepositInvoice, getDepositInvoice]);
-
-  // Hilfsfunktionen für Formatierung
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount || 0);
-  };
-
-  const formatDateSimple = (dateString) => {
-    if (!dateString) return '-';
-    try {
-      const date = dateString.toDate ? dateString.toDate() : new Date(dateString);
-      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    } catch {
-      return '-';
-    }
-  };
+  }, [createInvoice, hasDepositInvoice, getDepositInvoice, formatCurrency, formatDateSimple]);
 
   // Rechnung aktualisieren
   const updateInvoice = useCallback(async (invoiceId, invoiceData, changeDescription = 'Aktualisiert') => {
-    try {
-      setLoading(true);
-
-      const existingInvoice = invoices.find(i => i.id === invoiceId);
-      if (!existingInvoice) {
-        throw new Error('Rechnung nicht gefunden');
-      }
-
-      // Summen neu berechnen
-      const totals = calculateOfferTotals(invoiceData.items || [], invoiceData.totals?.discountPercent || 0);
-
-      // Version erhöhen und History aktualisieren
-      const newVersion = (existingInvoice.version || 1) + 1;
-      const history = [
-        ...(existingInvoice.history || []),
-        {
-          version: newVersion,
-          createdAt: new Date().toISOString(),
-          createdBy: user?.uid || 'system',
-          changes: changeDescription
-        }
-      ];
-
-      const updatedInvoice = {
-        ...invoiceData,
-        totals,
-        version: newVersion,
-        history
-      };
-
-      await InvoiceService.updateInvoice(invoiceId, updatedInvoice);
-      return { success: true };
-    } catch (err) {
-      console.error('Error updating invoice:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
+    const existingInvoice = invoices.find(i => i.id === invoiceId);
+    if (!existingInvoice) {
+      return { success: false, error: 'Rechnung nicht gefunden' };
     }
-  }, [invoices, calculateOfferTotals, user]);
+
+    // Summen neu berechnen
+    const totals = calculateOfferTotals(invoiceData.items || [], invoiceData.totals?.discountPercent || 0);
+
+    // Version erhöhen und History aktualisieren
+    const newVersion = (existingInvoice.version || 1) + 1;
+    const history = [
+      ...(existingInvoice.history || []),
+      {
+        version: newVersion,
+        createdAt: new Date().toISOString(),
+        createdBy: user?.uid || 'system',
+        changes: changeDescription
+      }
+    ];
+
+    const updatedInvoice = {
+      ...invoiceData,
+      totals,
+      version: newVersion,
+      history
+    };
+
+    return crud.execute(InvoiceService.updateInvoice, invoiceId, updatedInvoice);
+  }, [crud, invoices, calculateOfferTotals, user]);
 
   // Rechnung löschen
   const deleteInvoice = useCallback(async (invoiceId) => {
-    try {
-      setLoading(true);
-      await InvoiceService.deleteInvoice(invoiceId);
-      return { success: true };
-    } catch (err) {
-      console.error('Error deleting invoice:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return crud.execute(InvoiceService.deleteInvoice, invoiceId);
+  }, [crud]);
 
   // Status ändern
   const updateInvoiceStatus = useCallback(async (invoiceId, newStatus) => {
-    try {
-      const invoice = invoices.find(i => i.id === invoiceId);
-      if (!invoice) {
-        throw new Error('Rechnung nicht gefunden');
-      }
-
-      const statusData = {
-        status: newStatus
-      };
-
-      // Zusätzliche Timestamps je nach Status
-      if (newStatus === INVOICE_STATUS.SENT) {
-        statusData.sentAt = new Date().toISOString();
-      } else if (newStatus === INVOICE_STATUS.PAID) {
-        statusData.paidAt = new Date().toISOString();
-      } else if (newStatus === INVOICE_STATUS.CANCELLED) {
-        statusData.cancelledAt = new Date().toISOString();
-      }
-
-      await InvoiceService.updateInvoice(invoiceId, {
-        ...invoice,
-        ...statusData,
-        history: [
-          ...(invoice.history || []),
-          {
-            version: invoice.version || 1,
-            createdAt: new Date().toISOString(),
-            createdBy: user?.uid || 'system',
-            changes: `Status geändert: ${INVOICE_STATUS_LABELS[newStatus]?.label}`
-          }
-        ]
-      });
-
-      return { success: true };
-    } catch (err) {
-      console.error('Error updating invoice status:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
+    const invoice = invoices.find(i => i.id === invoiceId);
+    if (!invoice) {
+      return { success: false, error: 'Rechnung nicht gefunden' };
     }
-  }, [invoices, user]);
+
+    const statusData = {
+      status: newStatus
+    };
+
+    // Zusätzliche Timestamps je nach Status
+    if (newStatus === INVOICE_STATUS.SENT) {
+      statusData.sentAt = new Date().toISOString();
+    } else if (newStatus === INVOICE_STATUS.PAID) {
+      statusData.paidAt = new Date().toISOString();
+    } else if (newStatus === INVOICE_STATUS.CANCELLED) {
+      statusData.cancelledAt = new Date().toISOString();
+    }
+
+    return crud.execute(InvoiceService.updateInvoice, invoiceId, {
+      ...invoice,
+      ...statusData,
+      history: [
+        ...(invoice.history || []),
+        {
+          version: invoice.version || 1,
+          createdAt: new Date().toISOString(),
+          createdBy: user?.uid || 'system',
+          changes: `Status geändert: ${INVOICE_STATUS_LABELS[newStatus]?.label}`
+        }
+      ]
+    });
+  }, [crud, invoices, user]);
 
   // Rechnungen nach Kunde
   const getInvoicesByCustomer = useCallback((customerId) => {

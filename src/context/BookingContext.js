@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
 import { BookingService, MaterialService } from '../services/firebaseService';
+import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 
 const BookingContext = createContext();
 
@@ -12,115 +13,82 @@ export const useBookings = () => {
 };
 
 export const BookingProvider = ({ children }) => {
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Firebase Real-time Listener mit Custom Hook
+  const {
+    data: bookings,
+    loading: listenerLoading,
+    error: listenerError
+  } = useFirebaseListener(BookingService.subscribeToBookings);
 
-  // Firebase Real-time Listener
-  useEffect(() => {
-    let unsubscribe;
-    
-    const setupListener = async () => {
-      try {
-        setLoading(true);
-        unsubscribe = BookingService.subscribeToBookings((bookingsData) => {
-          setBookings(bookingsData);
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error('Error setting up bookings listener:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    };
+  // CRUD Operations Hook
+  const crud = useFirebaseCRUD();
 
-    setupListener();
+  // Kombinierter Loading-State
+  const loading = listenerLoading || crud.loading;
+  const error = listenerError || crud.error;
 
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
+  // CRUD Operationen mit konsistenter Rückgabe
+  const addBooking = useCallback(async (bookingData) => {
+    return crud.execute(BookingService.addBooking, bookingData);
+  }, [crud]);
 
+  const deleteBooking = useCallback(async (bookingId) => {
+    return crud.execute(BookingService.deleteBooking, bookingId);
+  }, [crud]);
 
-  const addBooking = async (bookingData) => {
-    try {
-      setLoading(true);
-      await BookingService.addBooking(bookingData);
-      // Real-time listener wird automatisch die UI aktualisieren
-    } catch (err) {
-      console.error('Error adding booking:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteBooking = async (bookingId) => {
-    try {
-      setLoading(true);
-      await BookingService.deleteBooking(bookingId);
-      // Real-time listener wird automatisch die UI aktualisieren
-    } catch (err) {
-      console.error('Error deleting booking:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const undoBooking = async (bookingId) => {
+  const undoBooking = useCallback(async (bookingId) => {
     const booking = bookings.find(b => b.id === bookingId);
-    if (booking) {
-      try {
-        // Bestand für alle Materialien rückgängig machen
-        for (const material of booking.materials) {
-          // Hole aktuelles Material aus Firebase
-          const currentMaterial = await MaterialService.getDocument(material.materialID);
-          if (currentMaterial) {
-            const stockChange = booking.type === 'Eingang'
-              ? -material.quantity  // Bei Eingang: Bestand reduzieren
-              : material.quantity;   // Bei Ausgang: Bestand erhöhen
-
-            const newStock = currentMaterial.stock + stockChange;
-            // Negativer Bestand = Nachbestellen, 0 = Nicht verfügbar, niedrig (≤ heatStock) oder auf Lager
-            const stockState = newStock < 0 ? 'Nachbestellen' :
-                              newStock === 0 ? 'Nicht verfügbar' :
-                              newStock <= currentMaterial.heatStock ? 'Niedrig' : 'Auf Lager';
-            
-            await MaterialService.updateMaterial(material.materialID, {
-              ...currentMaterial,
-              stock: newStock,
-              stockState
-            });
-          }
-        }
-        
-        // Buchung direkt löschen (elegantere Lösung)
-        await BookingService.deleteBooking(bookingId);
-        
-        return { success: true, message: 'Buchung erfolgreich rückgängig gemacht' };
-      } catch (err) {
-        console.error('Error undoing booking:', err);
-        setError(err.message);
-        throw err;
-      }
+    if (!booking) {
+      return { success: false, error: 'Buchung nicht gefunden' };
     }
-  };
 
-  const getBookingsByCustomer = (customerID) => {
+    try {
+      // Bestand für alle Materialien rückgängig machen
+      for (const material of booking.materials) {
+        // Hole aktuelles Material aus Firebase
+        const currentMaterial = await MaterialService.getDocument(material.materialID);
+        if (currentMaterial) {
+          const stockChange = booking.type === 'Eingang'
+            ? -material.quantity  // Bei Eingang: Bestand reduzieren
+            : material.quantity;   // Bei Ausgang: Bestand erhöhen
+
+          const newStock = currentMaterial.stock + stockChange;
+          // Negativer Bestand = Nachbestellen, 0 = Nicht verfügbar, niedrig (≤ heatStock) oder auf Lager
+          const stockState = newStock < 0 ? 'Nachbestellen' :
+                            newStock === 0 ? 'Nicht verfügbar' :
+                            newStock <= currentMaterial.heatStock ? 'Niedrig' : 'Auf Lager';
+
+          await MaterialService.updateMaterial(material.materialID, {
+            ...currentMaterial,
+            stock: newStock,
+            stockState
+          });
+        }
+      }
+
+      // Buchung direkt löschen
+      await BookingService.deleteBooking(bookingId);
+
+      return { success: true, message: 'Buchung erfolgreich rückgängig gemacht' };
+    } catch (err) {
+      console.error('Error undoing booking:', err);
+      return { success: false, error: err.message };
+    }
+  }, [bookings]);
+
+  // Hilfsfunktionen (keine async Operationen)
+  const getBookingsByCustomer = useCallback((customerID) => {
     return bookings.filter(booking => booking.customerID === customerID);
-  };
+  }, [bookings]);
 
-  const getBookingsByDateRange = (startDate, endDate) => {
+  const getBookingsByDateRange = useCallback((startDate, endDate) => {
     return bookings.filter(booking => {
       const bookingDate = new Date(booking.timestamp);
       return bookingDate >= startDate && bookingDate <= endDate;
     });
-  };
+  }, [bookings]);
 
-  const getBookingStatistics = () => {
+  const getBookingStatistics = useCallback(() => {
     const today = new Date();
     const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thisMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -129,19 +97,19 @@ export const BookingProvider = ({ children }) => {
       total: bookings.length,
       eingaenge: bookings.filter(b => b.type === 'Eingang').length,
       ausgaenge: bookings.filter(b => b.type === 'Ausgang').length,
-      heute: bookings.filter(b => 
+      heute: bookings.filter(b =>
         new Date(b.timestamp).toDateString() === today.toDateString()
       ).length,
-      dieseWoche: bookings.filter(b => 
+      dieseWoche: bookings.filter(b =>
         new Date(b.timestamp) >= thisWeek
       ).length,
-      dieserMonat: bookings.filter(b => 
+      dieserMonat: bookings.filter(b =>
         new Date(b.timestamp) >= thisMonth
       ).length,
       storniert: bookings.filter(b => b.status === 'Storniert').length,
       rueckbuchungen: bookings.filter(b => b.status === 'Rückbuchung').length
     };
-  };
+  }, [bookings]);
 
   const value = {
     bookings,

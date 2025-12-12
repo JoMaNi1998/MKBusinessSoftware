@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
 import { OfferService } from '../services/firebaseService';
 import { useCalculation } from './CalculationContext';
 import { useAuth } from './AuthContext';
+import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 
 const OfferContext = createContext();
 
@@ -31,44 +32,27 @@ export const OFFER_STATUS_LABELS = {
 };
 
 export const OfferProvider = ({ children }) => {
-  const [offers, setOffers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Firebase Real-time Listener mit Custom Hook
+  const {
+    data: offers,
+    loading: listenerLoading,
+    error: listenerError
+  } = useFirebaseListener(OfferService.subscribeToOffers);
+
+  // CRUD Operations Hook
+  const crud = useFirebaseCRUD();
+
+  // Kombinierter Loading-State
+  const loading = listenerLoading || crud.loading;
+  const error = listenerError || crud.error;
 
   const { calculateOfferTotals, calculateValidUntil, settings: calcSettings } = useCalculation();
   const { user } = useAuth();
 
-  // Firebase Real-time Listener
-  useEffect(() => {
-    let unsubscribe;
-
-    const setupListener = async () => {
-      try {
-        setLoading(true);
-        unsubscribe = OfferService.subscribeToOffers((offersData) => {
-          setOffers(offersData || []);
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error('Error setting up offers listener:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-
-    setupListener();
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
-
   // Neues Angebot erstellen
   const createOffer = useCallback(async (offerData) => {
     try {
-      setLoading(true);
+      crud.setLoading(true);
 
       // Angebotsnummer generieren
       const offerNumber = await OfferService.getNextOfferNumber();
@@ -84,7 +68,7 @@ export const OfferProvider = ({ children }) => {
 
       const newOffer = {
         ...offerData,
-        id: offerId,  // Eindeutige ID für Firestore
+        id: offerId,
         offerNumber,
         status: offerData.status || OFFER_STATUS.DRAFT,
         totals,
@@ -109,134 +93,98 @@ export const OfferProvider = ({ children }) => {
       return { success: true, offerId: result.id, offerNumber };
     } catch (err) {
       console.error('Error creating offer:', err);
-      setError(err.message);
       return { success: false, error: err.message };
     } finally {
-      setLoading(false);
+      crud.setLoading(false);
     }
-  }, [calculateOfferTotals, calculateValidUntil, calcSettings, user]);
+  }, [crud, calculateOfferTotals, calculateValidUntil, calcSettings, user]);
 
   // Angebot aktualisieren
   const updateOffer = useCallback(async (offerId, offerData, changeDescription = 'Aktualisiert') => {
-    try {
-      setLoading(true);
-
-      const existingOffer = offers.find(o => o.id === offerId);
-      if (!existingOffer) {
-        throw new Error('Angebot nicht gefunden');
-      }
-
-      // Summen neu berechnen
-      const totals = calculateOfferTotals(offerData.items || [], offerData.totals?.discountPercent || 0);
-
-      // Version erhöhen und History aktualisieren
-      const newVersion = (existingOffer.version || 1) + 1;
-      const history = [
-        ...(existingOffer.history || []),
-        {
-          version: newVersion,
-          createdAt: new Date().toISOString(),
-          createdBy: user?.uid || 'system',
-          changes: changeDescription
-        }
-      ];
-
-      const updatedOffer = {
-        ...offerData,
-        totals,
-        version: newVersion,
-        history
-      };
-
-      await OfferService.updateOffer(offerId, updatedOffer);
-      return { success: true };
-    } catch (err) {
-      console.error('Error updating offer:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
+    const existingOffer = offers.find(o => o.id === offerId);
+    if (!existingOffer) {
+      return { success: false, error: 'Angebot nicht gefunden' };
     }
-  }, [offers, calculateOfferTotals, user]);
+
+    // Summen neu berechnen
+    const totals = calculateOfferTotals(offerData.items || [], offerData.totals?.discountPercent || 0);
+
+    // Version erhöhen und History aktualisieren
+    const newVersion = (existingOffer.version || 1) + 1;
+    const history = [
+      ...(existingOffer.history || []),
+      {
+        version: newVersion,
+        createdAt: new Date().toISOString(),
+        createdBy: user?.uid || 'system',
+        changes: changeDescription
+      }
+    ];
+
+    const updatedOffer = {
+      ...offerData,
+      totals,
+      version: newVersion,
+      history
+    };
+
+    return crud.execute(OfferService.updateOffer, offerId, updatedOffer);
+  }, [crud, offers, calculateOfferTotals, user]);
 
   // Angebot löschen
   const deleteOffer = useCallback(async (offerId) => {
-    try {
-      setLoading(true);
-      await OfferService.deleteOffer(offerId);
-      return { success: true };
-    } catch (err) {
-      console.error('Error deleting offer:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    return crud.execute(OfferService.deleteOffer, offerId);
+  }, [crud]);
 
   // Angebot duplizieren
   const duplicateOffer = useCallback(async (offerId) => {
-    try {
-      const originalOffer = offers.find(o => o.id === offerId);
-      if (!originalOffer) {
-        throw new Error('Angebot nicht gefunden');
-      }
-
-      const { id, offerNumber, createdAt, updatedAt, history, version, status, ...offerData } = originalOffer;
-
-      return createOffer({
-        ...offerData,
-        notes: `Kopie von ${offerNumber}\n${offerData.conditions?.notes || ''}`
-      });
-    } catch (err) {
-      console.error('Error duplicating offer:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
+    const originalOffer = offers.find(o => o.id === offerId);
+    if (!originalOffer) {
+      return { success: false, error: 'Angebot nicht gefunden' };
     }
+
+    const { id, offerNumber, createdAt, updatedAt, history, version, status, ...offerData } = originalOffer;
+
+    return createOffer({
+      ...offerData,
+      notes: `Kopie von ${offerNumber}\n${offerData.conditions?.notes || ''}`
+    });
   }, [offers, createOffer]);
 
   // Status ändern
   const updateOfferStatus = useCallback(async (offerId, newStatus) => {
-    try {
-      const offer = offers.find(o => o.id === offerId);
-      if (!offer) {
-        throw new Error('Angebot nicht gefunden');
-      }
-
-      const statusData = {
-        status: newStatus
-      };
-
-      // Zusätzliche Timestamps je nach Status
-      if (newStatus === OFFER_STATUS.SENT) {
-        statusData.sentAt = new Date().toISOString();
-      } else if (newStatus === OFFER_STATUS.ACCEPTED) {
-        statusData.acceptedAt = new Date().toISOString();
-      } else if (newStatus === OFFER_STATUS.REJECTED) {
-        statusData.rejectedAt = new Date().toISOString();
-      }
-
-      await OfferService.updateOffer(offerId, {
-        ...offer,
-        ...statusData,
-        history: [
-          ...(offer.history || []),
-          {
-            version: offer.version || 1,
-            createdAt: new Date().toISOString(),
-            createdBy: user?.uid || 'system',
-            changes: `Status geändert: ${OFFER_STATUS_LABELS[newStatus]?.label}`
-          }
-        ]
-      });
-
-      return { success: true };
-    } catch (err) {
-      console.error('Error updating offer status:', err);
-      setError(err.message);
-      return { success: false, error: err.message };
+    const offer = offers.find(o => o.id === offerId);
+    if (!offer) {
+      return { success: false, error: 'Angebot nicht gefunden' };
     }
-  }, [offers, user]);
+
+    const statusData = {
+      status: newStatus
+    };
+
+    // Zusätzliche Timestamps je nach Status
+    if (newStatus === OFFER_STATUS.SENT) {
+      statusData.sentAt = new Date().toISOString();
+    } else if (newStatus === OFFER_STATUS.ACCEPTED) {
+      statusData.acceptedAt = new Date().toISOString();
+    } else if (newStatus === OFFER_STATUS.REJECTED) {
+      statusData.rejectedAt = new Date().toISOString();
+    }
+
+    return crud.execute(OfferService.updateOffer, offerId, {
+      ...offer,
+      ...statusData,
+      history: [
+        ...(offer.history || []),
+        {
+          version: offer.version || 1,
+          createdAt: new Date().toISOString(),
+          createdBy: user?.uid || 'system',
+          changes: `Status geändert: ${OFFER_STATUS_LABELS[newStatus]?.label}`
+        }
+      ]
+    });
+  }, [crud, offers, user]);
 
   // Position zu einem Angebot hinzufügen
   const addOfferItem = useCallback((offer, newItem) => {

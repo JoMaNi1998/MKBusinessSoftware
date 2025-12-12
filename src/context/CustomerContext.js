@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
 import { CustomerService } from '../services/firebaseService';
+import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 
 const CustomerContext = createContext();
 
@@ -12,156 +13,61 @@ export const useCustomers = () => {
 };
 
 export const CustomerProvider = ({ children }) => {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // Firebase Real-time Listener mit Custom Hook
+  const {
+    data: customers,
+    loading: listenerLoading,
+    error: listenerError,
+    setData: setCustomers
+  } = useFirebaseListener(CustomerService.subscribeToCustomers);
 
-  // Beispieldaten basierend auf Ihren Excel-Tabellen
-  const sampleCustomers = [
-    {
-      id: 'RKS-IndustriestraßeS0b-69190Walldorf',
-      customerID: 'RKS-IndustriestraßeS0b-69190Walldorf',
-      firmennameKundenname: 'RKS Industriestraße 50b, 69190 Walldorf',
-      street: 'Industriestraße 50b',
-      houseNumber: '',
-      postalCode: '69190',
-      city: 'Walldorf',
-      address: 'Industriestraße 50b, 69190 Walldorf',
-      email: 'info@rks-walldorf.de',
-      phone: '+49 6227 123456',
-      contact: 'Herr Schmidt',
-      notes: 'Hauptkunde für Elektroinstallationen'
-    },
-    {
-      id: 'Elektro-Wagner-Hauptstraße12-69168Wiesloch',
-      customerID: 'Elektro-Wagner-Hauptstraße12-69168Wiesloch',
-      firmennameKundenname: 'Elektro Wagner, Hauptstraße 12, 69168 Wiesloch',
-      street: 'Hauptstraße 12',
-      houseNumber: '',
-      postalCode: '69168',
-      city: 'Wiesloch',
-      address: 'Hauptstraße 12, 69168 Wiesloch',
-      email: 'wagner@elektro-wiesloch.de',
-      phone: '+49 6222 987654',
-      contact: 'Frau Wagner',
-      notes: 'Spezialist für Industrieanlagen'
-    }
-  ];
+  // CRUD Operations Hook
+  const crud = useFirebaseCRUD();
 
-  // Sample-Kunden-Initialisierung ENTFERNT - nur noch echte Firebase-Daten
-  // useEffect(() => {
-  //   const initializeSampleData = async () => {
-  //     if (!loading && customers.length === 0 && !error) {
-  //       try {
-  //         console.log('Initializing customer sample data...');
-  //         for (const customer of sampleCustomers) {
-  //           await CustomerService.addCustomer(customer);
-  //         }
-  //       } catch (err) {
-  //         console.error('Error initializing customer sample data:', err);
-  //       }
-  //     }
-  //   };
-  //
-  //   initializeSampleData();
-  // }, [loading, customers.length, error]);
+  // Kombinierter Loading-State
+  const loading = listenerLoading || crud.loading;
+  const error = listenerError || crud.error;
 
-  // Firebase Real-time Listener
-  useEffect(() => {
-    let unsubscribe;
-    
-    const setupListener = async () => {
-      try {
-        setLoading(true);
-        unsubscribe = CustomerService.subscribeToCustomers((customersData) => {
-          setCustomers(customersData);
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error('Error setting up customers listener:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    };
+  // CRUD Operationen mit konsistenter Rückgabe
+  const addCustomer = useCallback(async (customerData) => {
+    return crud.execute(CustomerService.addCustomer, customerData);
+  }, [crud]);
 
-    setupListener();
+  const updateCustomer = useCallback(async (customerId, customerData) => {
+    return crud.execute(CustomerService.updateCustomer, customerId, customerData);
+  }, [crud]);
 
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, []);
+  const deleteCustomer = useCallback(async (customerId) => {
+    return crud.execute(CustomerService.deleteCustomer, customerId);
+  }, [crud]);
 
-  const [projects, setProjects] = useState([]);
-
-  // Initialisierung wurde entfernt - Firebase Real-time Listener übernimmt die Datensynchronisation
-
-  const addCustomer = async (customerData) => {
-    try {
-      setLoading(true);
-      await CustomerService.addCustomer(customerData);
-      // Real-time listener wird automatisch die UI aktualisieren
-    } catch (err) {
-      console.error('Error adding customer:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateCustomer = async (customerId, customerData) => {
-    try {
-      setLoading(true);
-      await CustomerService.updateCustomer(customerId, customerData);
-      // Real-time listener wird automatisch die UI aktualisieren
-    } catch (err) {
-      console.error('Error updating customer:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteCustomer = async (customerId) => {
-    try {
-      setLoading(true);
-      await CustomerService.deleteCustomer(customerId);
-      // Real-time listener wird automatisch die UI aktualisieren
-    } catch (err) {
-      console.error('Error deleting customer:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addProject = (customerId, projectData) => {
-    setCustomers(prev => 
-      prev.map(customer => 
-        customer.id === customerId 
-          ? { 
-              ...customer, 
-              projects: [...customer.projects, { 
-                id: Date.now().toString(), 
-                ...projectData, 
-                createdAt: new Date() 
+  // Lokale State-Manipulationen (für Projekte innerhalb von Kunden)
+  const addProject = useCallback((customerId, projectData) => {
+    setCustomers(prev =>
+      prev.map(customer =>
+        customer.id === customerId
+          ? {
+              ...customer,
+              projects: [...(customer.projects || []), {
+                id: Date.now().toString(),
+                ...projectData,
+                createdAt: new Date()
               }],
               lastActivity: new Date()
             }
           : customer
       )
     );
-  };
+  }, [setCustomers]);
 
-  const updateProject = (customerId, projectId, projectData) => {
-    setCustomers(prev => 
-      prev.map(customer => 
-        customer.id === customerId 
-          ? { 
-              ...customer, 
-              projects: customer.projects.map(project => 
-                project.id === projectId 
+  const updateProject = useCallback((customerId, projectId, projectData) => {
+    setCustomers(prev =>
+      prev.map(customer =>
+        customer.id === customerId
+          ? {
+              ...customer,
+              projects: (customer.projects || []).map(project =>
+                project.id === projectId
                   ? { ...project, ...projectData }
                   : project
               ),
@@ -170,63 +76,30 @@ export const CustomerProvider = ({ children }) => {
           : customer
       )
     );
-  };
+  }, [setCustomers]);
 
-  const deleteProject = (customerId, projectId) => {
-    setCustomers(prev => 
-      prev.map(customer => 
-        customer.id === customerId 
-          ? { 
-              ...customer, 
-              projects: customer.projects.filter(project => project.id !== projectId),
+  const deleteProject = useCallback((customerId, projectId) => {
+    setCustomers(prev =>
+      prev.map(customer =>
+        customer.id === customerId
+          ? {
+              ...customer,
+              projects: (customer.projects || []).filter(project => project.id !== projectId),
               lastActivity: new Date()
             }
           : customer
       )
     );
-  };
+  }, [setCustomers]);
 
-  const getCustomerById = (id) => {
+  const getCustomerById = useCallback((id) => {
     return customers.find(customer => customer.id === id);
-  };
+  }, [customers]);
 
-  const addProjectToCustomer = (customerId, project) => {
-    setCustomers(prev => prev.map(customer => 
-      customer.id === customerId 
-        ? { 
-            ...customer, 
-            projects: [...customer.projects, { ...project, id: `project-${Date.now()}` }],
-            lastActivity: new Date()
-          }
-        : customer
-    ));
-  };
-
-  const updateCustomerProject = (customerId, projectId, updatedProject) => {
-    setCustomers(prev => prev.map(customer => 
-      customer.id === customerId 
-        ? { 
-            ...customer, 
-            projects: customer.projects.map(project => 
-              project.id === projectId ? { ...updatedProject, id: projectId } : project
-            ),
-            lastActivity: new Date()
-          }
-        : customer
-    ));
-  };
-
-  const deleteCustomerProject = (customerId, projectId) => {
-    setCustomers(prev => prev.map(customer => 
-      customer.id === customerId 
-        ? { 
-            ...customer, 
-            projects: customer.projects.filter(project => project.id !== projectId),
-            lastActivity: new Date()
-          }
-        : customer
-    ));
-  };
+  // Alias-Funktionen für Kompatibilität
+  const addProjectToCustomer = addProject;
+  const updateCustomerProject = updateProject;
+  const deleteCustomerProject = deleteProject;
 
   const value = {
     customers,

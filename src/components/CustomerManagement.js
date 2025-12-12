@@ -293,6 +293,19 @@ const CustomerManagement = () => {
         </button>
       </div>
 
+      {/* Statistiken */}
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Gesamt Kunden</p>
+              <p className="text-2xl font-bold text-gray-900">{customers.length}</p>
+            </div>
+            <Users className="h-8 w-8 text-primary-600" />
+          </div>
+        </div>
+      </div>
+
       {/* Suchleiste und Filter */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col space-y-4">
@@ -307,7 +320,7 @@ const CustomerManagement = () => {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
-          
+
           {/* Filter-Reset Button */}
           {hasActiveFilters() && (
             <div className="flex items-center space-x-2">
@@ -320,19 +333,6 @@ const CustomerManagement = () => {
               </button>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Statistiken */}
-      <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Gesamt Kunden</p>
-              <p className="text-2xl font-bold text-gray-900">{customers.length}</p>
-            </div>
-            <Users className="h-8 w-8 text-primary-600" />
-          </div>
         </div>
       </div>
 

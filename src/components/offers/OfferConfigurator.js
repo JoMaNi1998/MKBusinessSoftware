@@ -704,6 +704,45 @@ const OfferConfigurator = () => {
   };
 
   // Datei-Upload für PV-Konfiguration
+  // Hilfsfunktion: Bild mit korrekter Orientierung erstellen
+  const fixImageOrientation = (file) => {
+    return new Promise((resolve) => {
+      // Nur für Bilder
+      if (!file.type.startsWith('image/')) {
+        resolve(file);
+        return;
+      }
+
+      const reader = new window.FileReader();
+      reader.onload = (e) => {
+        const imgElement = document.createElement('img');
+        imgElement.onload = () => {
+          // Canvas erstellen und Bild zeichnen (Browser korrigiert EXIF automatisch)
+          const canvas = document.createElement('canvas');
+          canvas.width = imgElement.width;
+          canvas.height = imgElement.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(imgElement, 0, 0);
+
+          // Als Blob exportieren
+          canvas.toBlob((blob) => {
+            if (blob) {
+              // Neuen File mit korrigierter Orientierung erstellen
+              const correctedFile = new window.File([blob], file.name, { type: 'image/jpeg' });
+              resolve(correctedFile);
+            } else {
+              resolve(file);
+            }
+          }, 'image/jpeg', 0.92);
+        };
+        imgElement.onerror = () => resolve(file);
+        imgElement.src = e.target.result;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (event) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -726,12 +765,15 @@ const OfferConfigurator = () => {
           continue;
         }
 
+        // Bild-Orientierung korrigieren
+        const processedFile = await fixImageOrientation(file);
+
         const timestamp = Date.now();
         const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const storagePath = `offers/${offerNum}/pv-config/${timestamp}_${safeName}`;
         const storageRef = ref(storage, storagePath);
 
-        await uploadBytes(storageRef, file);
+        await uploadBytes(storageRef, processedFile);
         const downloadURL = await getDownloadURL(storageRef);
 
         uploadedFiles.push({
@@ -739,8 +781,8 @@ const OfferConfigurator = () => {
           name: file.name,
           path: storagePath,
           url: downloadURL,
-          type: file.type,
-          size: file.size,
+          type: processedFile.type,
+          size: processedFile.size,
           uploadedAt: new Date().toISOString()
         });
       }
@@ -985,77 +1027,6 @@ const OfferConfigurator = () => {
           </div>
         )}
 
-        {/* PV-Konfiguration Upload */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <Sun className="h-5 w-5 text-green-600" />
-              <h4 className="font-medium text-green-900">PV-Konfiguration</h4>
-            </div>
-            <label className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center cursor-pointer text-sm ${isUploading ? 'opacity-70 cursor-wait' : ''}`}>
-              {isUploading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4 mr-2" />
-              )}
-              {isUploading ? 'Wird hochgeladen...' : 'Datei hochladen'}
-              <input
-                type="file"
-                accept=".pdf,image/*"
-                multiple
-                onChange={handleFileUpload}
-                disabled={isUploading}
-                className="hidden"
-              />
-            </label>
-          </div>
-          <p className="text-xs text-green-700 mb-3">Laden Sie die PV-Konfiguration (PDF oder Bild) hoch, um sie dem Angebot beizufügen.</p>
-
-          {/* Hochgeladene Dateien */}
-          {pvConfigFiles.length > 0 && (
-            <div className="space-y-2">
-              {pvConfigFiles.map(file => (
-                <div key={file.id} className="flex items-center justify-between bg-white border border-green-200 rounded-lg px-3 py-2">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <File className="h-5 w-5 text-green-600 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 flex-shrink-0">
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                      title="Öffnen"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </a>
-                    <button
-                      onClick={() => handleDeleteFile(file)}
-                      className="p-1.5 text-red-500 hover:bg-red-50 rounded"
-                      title="Löschen"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {pvConfigFiles.length === 0 && (
-            <div className="text-center py-4 border-2 border-dashed border-green-200 rounded-lg">
-              <File className="h-8 w-8 mx-auto text-green-300 mb-2" />
-              <p className="text-sm text-green-600">Noch keine Dateien hochgeladen</p>
-            </div>
-          )}
-        </div>
-
         {/* Katalog-Kategorien (nicht-Dropdown) ausklappbar */}
         <div className="border rounded-lg overflow-hidden">
           <div className="bg-gray-50 px-4 py-3">
@@ -1158,12 +1129,58 @@ const OfferConfigurator = () => {
       <div className="bg-gray-100 -m-6 p-6">
         <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
           <div className="p-8">
-            {/* Header */}
-            <div className="flex justify-between items-start mb-8 pb-6 border-b">
+            {/* Header mit Firmeninfo rechts */}
+            <div className="flex justify-between items-start mb-2">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   ANGEBOT {totalKwp && <span className="text-lg font-normal text-gray-600">({totalKwp} kWp)</span>}
                 </h1>
+                {/* PV-Konfiguration Bild - linksbündig direkt unter ANGEBOT */}
+                {pvConfigFiles.filter(file => file.type?.startsWith('image/')).length > 0 ? (
+                  <div className="relative group inline-block mt-4">
+                    <img
+                      src={pvConfigFiles.filter(file => file.type?.startsWith('image/'))[0]?.url}
+                      alt="PV-Konfiguration"
+                      className="w-32 h-24 object-contain object-left"
+                    />
+                    <div className="absolute top-1 right-1 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <a
+                        href={pvConfigFiles.filter(file => file.type?.startsWith('image/'))[0]?.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 bg-white rounded shadow text-blue-600 hover:bg-blue-50"
+                        title="Vollbild"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </a>
+                      <button
+                        onClick={() => handleDeleteFile(pvConfigFiles.filter(file => file.type?.startsWith('image/'))[0])}
+                        className="p-1 bg-white rounded shadow text-red-500 hover:bg-red-50"
+                        title="Löschen"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className={`flex flex-col items-center justify-center w-32 h-24 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors mt-4 ${isUploading ? 'opacity-70 cursor-wait' : ''}`}>
+                    {isUploading ? (
+                      <Loader2 className="h-5 w-5 text-gray-400 animate-spin" />
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5 text-gray-400 mb-1" />
+                        <span className="text-xs text-gray-500">Bild</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
               <div className="text-right text-sm text-gray-600">
                 <p className="font-medium text-gray-900">{company.name}</p>
@@ -1175,7 +1192,7 @@ const OfferConfigurator = () => {
             </div>
 
             {/* Kunde & Datum */}
-            <div className="grid grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-2 gap-8 mb-6">
               <div>
                 <div className="text-sm">
                   {project?.contactPersonName && (
@@ -1252,8 +1269,18 @@ const OfferConfigurator = () => {
                           onChange={(e) => handleUpdateItem(item.id, { shortText: e.target.value })}
                           className="w-full bg-transparent border-0 p-0 focus:ring-0 font-medium text-gray-900"
                         />
-                        {item.longText && (
-                          <p className="text-xs text-gray-500 mt-1">{item.longText}</p>
+                        {item.type === 'manual' ? (
+                          <textarea
+                            value={item.longText || ''}
+                            onChange={(e) => handleUpdateItem(item.id, { longText: e.target.value })}
+                            placeholder="Beschreibung eingeben..."
+                            rows={2}
+                            className="w-full bg-transparent border border-gray-200 rounded p-1 mt-1 text-xs text-gray-500 focus:ring-1 focus:ring-blue-500 resize-none"
+                          />
+                        ) : (
+                          item.longText && (
+                            <p className="text-xs text-gray-500 mt-1">{item.longText}</p>
+                          )
                         )}
                         {item.laborFactor > 1 && (
                           <span className="text-xs text-amber-600 block">
@@ -1535,12 +1562,20 @@ const OfferConfigurator = () => {
         <div className="max-w-[210mm] mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
           {/* PDF Content - A4 Layout */}
           <div className="p-8">
-            {/* Header */}
-            <div className="flex justify-between items-start mb-8 pb-6 border-b">
+            {/* Header mit Firmeninfo rechts */}
+            <div className="flex justify-between items-start mb-2">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   ANGEBOT {totalKwp && <span className="text-lg font-normal text-gray-600">({totalKwp} kWp)</span>}
                 </h1>
+                {/* PV-Konfiguration Bild - linksbündig direkt unter ANGEBOT */}
+                {pvConfigFiles.filter(file => file.type?.startsWith('image/')).length > 0 && (
+                  <img
+                    src={pvConfigFiles.filter(file => file.type?.startsWith('image/'))[0]?.url}
+                    alt="PV-Konfiguration"
+                    className="w-32 h-24 object-contain object-left mt-4"
+                  />
+                )}
               </div>
               <div className="text-right text-sm text-gray-600">
                 <p className="font-medium text-gray-900">{company.name}</p>
@@ -1552,7 +1587,7 @@ const OfferConfigurator = () => {
             </div>
 
             {/* Kunde & Datum */}
-            <div className="grid grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-2 gap-8 mb-6">
               <div>
                 <div className="text-sm">
                   {project?.contactPersonName && (

@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
+  Filter,
   FileText,
   Edit,
   Trash2,
@@ -14,14 +15,29 @@ import {
   Users,
   Euro,
   AlertCircle,
-  XCircle
+  XCircle,
+  Settings
 } from 'lucide-react';
 import { useInvoices, INVOICE_STATUS, INVOICE_STATUS_LABELS } from '../../context/InvoiceContext';
 import { useCustomers } from '../../context/CustomerContext';
 import { useProjects } from '../../context/ProjectContext';
 import { useNotification } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import BaseModal from '../BaseModal';
 import InvoicePDFPreview from './InvoicePDFPreview';
+
+// Spalten-Konfiguration
+const availableColumns = [
+  { key: 'rechnung', label: 'Rechnung', required: true },
+  { key: 'kunde', label: 'Kunde', required: false },
+  { key: 'angebot', label: 'Angebot', required: false },
+  { key: 'betrag', label: 'Betrag', required: false },
+  { key: 'status', label: 'Status', required: false },
+  { key: 'faellig', label: 'Fällig am', required: false },
+  { key: 'aktionen', label: 'Aktionen', required: true }
+];
 
 const InvoiceManagement = () => {
   const navigate = useNavigate();
@@ -29,11 +45,28 @@ const InvoiceManagement = () => {
   const { customers } = useCustomers();
   const { projects } = useProjects();
   const { showNotification } = useNotification();
+  const { user } = useAuth();
 
   // Filter & Search State
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
+
+  // Column Settings State
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState({
+    rechnung: true,
+    kunde: true,
+    angebot: true,
+    betrag: true,
+    status: true,
+    faellig: true,
+    aktionen: true
+  });
+  const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const [activeColumnFilter, setActiveColumnFilter] = useState(null);
+  const columnSettingsRef = useRef(null);
+  const filterRef = useRef(null);
 
   // Modal State
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -41,6 +74,91 @@ const InvoiceManagement = () => {
   const [showPDFPreview, setShowPDFPreview] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const [showActionsMenu, setShowActionsMenu] = useState(null);
+
+  // Unique statuses for filter
+  const uniqueStatuses = useMemo(() => {
+    return Object.entries(INVOICE_STATUS_LABELS).map(([key, value]) => ({
+      value: key,
+      label: value.label
+    }));
+  }, []);
+
+  // Firebase Preferences laden
+  const loadColumnPreferences = async () => {
+    if (!user?.uid) {
+      setLoadingPreferences(false);
+      return;
+    }
+    try {
+      const prefsDoc = await getDoc(doc(db, 'user-preferences', user.uid));
+      if (prefsDoc.exists()) {
+        const prefs = prefsDoc.data();
+        if (prefs.invoiceColumns) {
+          setVisibleColumns(prev => ({ ...prev, ...prefs.invoiceColumns }));
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Spalteneinstellungen:', error);
+    } finally {
+      setLoadingPreferences(false);
+    }
+  };
+
+  // Firebase Preferences speichern
+  const saveColumnPreferences = async (newColumns) => {
+    if (!user?.uid) return;
+    try {
+      const prefsRef = doc(db, 'user-preferences', user.uid);
+      const prefsDoc = await getDoc(prefsRef);
+      const existingPrefs = prefsDoc.exists() ? prefsDoc.data() : {};
+      await setDoc(prefsRef, {
+        ...existingPrefs,
+        invoiceColumns: newColumns
+      });
+    } catch (error) {
+      console.error('Fehler beim Speichern der Spalteneinstellungen:', error);
+    }
+  };
+
+  // Spalte ein-/ausblenden
+  const toggleColumn = (columnKey) => {
+    const column = availableColumns.find(c => c.key === columnKey);
+    if (column?.required) return;
+
+    const newColumns = {
+      ...visibleColumns,
+      [columnKey]: !visibleColumns[columnKey]
+    };
+    setVisibleColumns(newColumns);
+    saveColumnPreferences(newColumns);
+  };
+
+  // Filter-Änderung für Spaltenfilter
+  const handleColumnFilterChange = (filterType, value) => {
+    if (filterType === 'status') {
+      setStatusFilter(value);
+    }
+    setActiveColumnFilter(null);
+  };
+
+  // Click-outside Handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (columnSettingsRef.current && !columnSettingsRef.current.contains(event.target)) {
+        setShowColumnSettings(false);
+      }
+      if (filterRef.current && !filterRef.current.contains(event.target)) {
+        setActiveColumnFilter(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Spalteneinstellungen beim Mount laden
+  useEffect(() => {
+    loadColumnPreferences();
+  }, [user?.uid]);
 
   // Statistiken
   const stats = useMemo(() => getStatistics(), [getStatistics, invoices]);
@@ -241,48 +359,15 @@ const InvoiceManagement = () => {
 
       {/* Filter & Suche */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 flex-shrink-0">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Suche */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechnungsnummer, Kunde oder Angebot suchen..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div className="w-full md:w-48">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Alle Status</option>
-              {Object.entries(INVOICE_STATUS_LABELS).map(([key, value]) => (
-                <option key={key} value={key}>{value.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Kunden Filter */}
-          <div className="w-full md:w-48">
-            <select
-              value={customerFilter}
-              onChange={(e) => setCustomerFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Alle Kunden</option>
-              {customersWithInvoices.map(customer => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.firmennameKundenname || customer.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Rechnungsnummer, Kunde oder Angebot suchen..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       </div>
 
@@ -290,6 +375,42 @@ const InvoiceManagement = () => {
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">Rechnungsliste</h2>
+          <div className="relative" ref={columnSettingsRef}>
+            <button
+              onClick={() => setShowColumnSettings(!showColumnSettings)}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+              title="Spalteneinstellungen"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+            {showColumnSettings && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
+                <div className="p-3 border-b border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-900">Sichtbare Spalten</h4>
+                </div>
+                <div className="p-2 max-h-64 overflow-auto">
+                  {availableColumns.map((column) => (
+                    <label
+                      key={column.key}
+                      className={`flex items-center px-2 py-1.5 rounded hover:bg-gray-50 ${column.required ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns[column.key]}
+                        onChange={() => toggleColumn(column.key)}
+                        disabled={column.required}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">{column.label}</span>
+                      {column.required && (
+                        <span className="ml-auto text-xs text-gray-400">Pflicht</span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -319,30 +440,73 @@ const InvoiceManagement = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      <div className="flex items-center gap-1">
+                    {visibleColumns.rechnung && (
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Rechnung
-                        <ChevronDown className="h-3 w-3 text-gray-400" />
-                      </div>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Kunde
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Angebot
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Betrag
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Fällig am
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Aktionen
-                    </th>
+                      </th>
+                    )}
+                    {visibleColumns.kunde && (
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Kunde
+                      </th>
+                    )}
+                    {visibleColumns.angebot && (
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Angebot
+                      </th>
+                    )}
+                    {visibleColumns.betrag && (
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Betrag
+                      </th>
+                    )}
+                    {visibleColumns.status && (
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase relative">
+                        <div className="flex items-center justify-center gap-1">
+                          <span>Status</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveColumnFilter(activeColumnFilter === 'status' ? null : 'status');
+                            }}
+                            className={`p-0.5 rounded hover:bg-gray-200 ${statusFilter !== 'all' ? 'text-blue-600' : 'text-gray-400'}`}
+                          >
+                            <Filter className="h-3 w-3" />
+                          </button>
+                        </div>
+                        {activeColumnFilter === 'status' && (
+                          <div ref={filterRef} className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
+                            <div className="p-2">
+                              <button
+                                onClick={() => handleColumnFilterChange('status', 'all')}
+                                className={`w-full text-left px-3 py-1.5 text-sm rounded ${statusFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}
+                              >
+                                Alle Status
+                              </button>
+                              {uniqueStatuses.map((status) => (
+                                <button
+                                  key={status.value}
+                                  onClick={() => handleColumnFilterChange('status', status.value)}
+                                  className={`w-full text-left px-3 py-1.5 text-sm rounded ${statusFilter === status.value ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}
+                                >
+                                  {status.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </th>
+                    )}
+                    {visibleColumns.faellig && (
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Fällig am
+                      </th>
+                    )}
+                    {visibleColumns.aktionen && (
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Aktionen
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -352,28 +516,41 @@ const InvoiceManagement = () => {
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => handleViewInvoice(invoice)}
                     >
-                      <td className="px-4 py-3">
-                        <span className="font-medium text-gray-900">{invoice.invoiceNumber}</span>
-                        <span className="text-xs text-gray-500 block">{formatDate(invoice.invoiceDate)}</span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2 text-gray-400" />
-                          {getCustomerName(invoice.customerID)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 text-sm">
-                        {invoice.offerNumber || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium">
-                        {formatPrice(invoice.totals?.grossTotal)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {getStatusBadge(invoice.status)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 text-sm">
-                        {formatDate(invoice.dueDate)}
-                      </td>
+                      {visibleColumns.rechnung && (
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-gray-900">{invoice.invoiceNumber}</span>
+                          <span className="text-xs text-gray-500 block">{formatDate(invoice.invoiceDate)}</span>
+                        </td>
+                      )}
+                      {visibleColumns.kunde && (
+                        <td className="px-4 py-3 text-gray-600">
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-2 text-gray-400" />
+                            {getCustomerName(invoice.customerID)}
+                          </div>
+                        </td>
+                      )}
+                      {visibleColumns.angebot && (
+                        <td className="px-4 py-3 text-gray-600 text-sm">
+                          {invoice.offerNumber || '-'}
+                        </td>
+                      )}
+                      {visibleColumns.betrag && (
+                        <td className="px-4 py-3 text-right font-medium">
+                          {formatPrice(invoice.totals?.grossTotal)}
+                        </td>
+                      )}
+                      {visibleColumns.status && (
+                        <td className="px-4 py-3 text-center">
+                          {getStatusBadge(invoice.status)}
+                        </td>
+                      )}
+                      {visibleColumns.faellig && (
+                        <td className="px-4 py-3 text-gray-600 text-sm">
+                          {formatDate(invoice.dueDate)}
+                        </td>
+                      )}
+                      {visibleColumns.aktionen && (
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="relative inline-block">
                           <button
@@ -432,6 +609,7 @@ const InvoiceManagement = () => {
                           )}
                         </div>
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
