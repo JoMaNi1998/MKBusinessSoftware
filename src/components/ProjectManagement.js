@@ -299,63 +299,44 @@ const ProjectManagement = () => {
   return (
     <div className="h-full flex flex-col space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Projekte</h1>
-          <p className="text-gray-600">Verwalten Sie Ihre Kundenprojekte</p>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 flex-shrink-0">
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Projekte</h1>
+          <p className="text-gray-600 hidden sm:block">Verwalten Sie Ihre Kundenprojekte</p>
         </div>
-        <div className="flex space-x-3">
-          <button className="flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
-            <Package className="h-4 w-4 mr-2" />
-            Exportieren
+        <div className="flex flex-wrap gap-2">
+          <button className="flex-1 sm:flex-none flex items-center justify-center px-3 sm:px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            <Package className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Exportieren</span>
           </button>
           <button
             onClick={handleAddProject}
-            className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Projekt hinzufügen
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Projekt hinzufügen</span>
+            <span className="sm:hidden">Neu</span>
           </button>
         </div>
       </div>
 
-      {/* Statistiken */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-shrink-0">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Gesamt Projekte</p>
-              <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
-            </div>
-            <Building className="h-8 w-8 text-primary-600" />
-          </div>
+      {/* Statistiken - Kompakt auf Mobile */}
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-1.5 md:gap-4 flex-shrink-0">
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Gesamt</p>
+          <p className="text-base md:text-2xl font-bold text-gray-900">{projects.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Aktiv</p>
-              <p className="text-2xl font-bold text-green-600">{projects.filter(p => p.status === 'Aktiv').length}</p>
-            </div>
-            <Package className="h-8 w-8 text-green-500" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Aktiv</p>
+          <p className="text-base md:text-2xl font-bold text-green-600">{projects.filter(p => p.status === 'Aktiv').length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Geplant</p>
-              <p className="text-2xl font-bold text-yellow-600">{projects.filter(p => p.status === 'Geplant').length}</p>
-            </div>
-            <Calendar className="h-8 w-8 text-yellow-500" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Geplant</p>
+          <p className="text-base md:text-2xl font-bold text-yellow-600">{projects.filter(p => p.status === 'Geplant').length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Abgeschlossen</p>
-              <p className="text-2xl font-bold text-gray-600">{projects.filter(p => p.status === 'Abgeschlossen').length}</p>
-            </div>
-            <FileText className="h-8 w-8 text-gray-500" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Fertig</p>
+          <p className="text-base md:text-2xl font-bold text-gray-600">{projects.filter(p => p.status === 'Abgeschlossen').length}</p>
         </div>
       </div>
 
@@ -427,9 +408,57 @@ const ProjectManagement = () => {
           </div>
         </div>
 
-        {/* Scrollbare Tabelle */}
+        {/* Scrollbare Tabelle / Mobile Cards */}
         <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-auto">
+          {/* Mobile: Card-Liste */}
+          <div className="md:hidden h-full overflow-auto p-4 space-y-3">
+            {sortedProjects.map((project) => {
+              const customer = customers.find(c => c.id === project.customerID);
+              return (
+                <div
+                  key={project.id}
+                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
+                  onClick={() => handleProjectClick(project)}
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{project.name}</p>
+                      <p className="text-sm text-gray-500">{project.projectID}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${getStatusColor(project.status)}`}>
+                      {project.status}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center text-sm text-gray-600">
+                    <User className="h-4 w-4 mr-1 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">{customer?.firmennameKundenname || 'Unbekannter Kunde'}</span>
+                  </div>
+                  {project.address && (
+                    <div className="mt-1 flex items-center text-sm text-gray-500">
+                      <MapPin className="h-4 w-4 mr-1 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">{project.address}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {sortedProjects.length === 0 && (
+              <div className="text-center py-12">
+                <Building className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Projekte gefunden</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {searchTerm || columnFilters.status !== 'alle' || columnFilters.customer !== 'alle'
+                    ? 'Versuchen Sie andere Suchbegriffe oder Filter.'
+                    : 'Beginnen Sie mit dem Erstellen Ihres ersten Projekts.'
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Tabelle */}
+          <div className="hidden md:block h-full overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -630,8 +659,9 @@ const ProjectManagement = () => {
           </div>
         </div>
 
+        {/* Desktop Empty State */}
         {sortedProjects.length === 0 && (
-          <div className="text-center py-12">
+          <div className="hidden md:block text-center py-12">
             <Building className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Projekte gefunden</h3>
             <p className="mt-1 text-sm text-gray-500">

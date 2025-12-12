@@ -193,42 +193,60 @@ const BillOfMaterials = () => {
   // ---- UI: Projektauswahl ----
   if (showProjectSelect) {
     return (
-      <div className="h-full flex flex-col bg-white">
+      <div className="h-full flex flex-col space-y-6">
         {/* Header */}
-        <div className="flex-shrink-0 border-b border-gray-200 p-4">
-          <div className="flex items-center space-x-3">
-            <FileText className="h-6 w-6 text-blue-600" />
-            <h1 className="text-xl font-bold text-gray-900">Stückliste</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="pl-12 sm:pl-0">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Stückliste</h1>
+            <p className="mt-1 text-sm text-gray-600 hidden sm:block">
+              Wählen Sie ein Projekt für die Stückliste
+            </p>
           </div>
         </div>
 
-        {/* Projektauswahl */}
-        <div className="flex-1 p-6">
-          <div className="max-w-2xl mx-auto">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                placeholder="Projekt suchen…"
-                value={projectSearch}
-                onChange={(e) => setProjectSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+        {/* Statistik */}
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow inline-flex items-center gap-3">
+          <FileText className="h-5 w-5 md:h-6 md:w-6 text-primary-600" />
+          <div>
+            <span className="text-base md:text-xl font-bold text-gray-900">{projects.length}</span>
+            <span className="text-xs md:text-sm text-gray-600 ml-2">Projekte</span>
+          </div>
+        </div>
 
-            <div className="space-y-1 max-h-72 overflow-y-auto">
+        {/* Suchleiste */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Projekt suchen (Name, Kunde, Status)..."
+              value={projectSearch}
+              onChange={(e) => setProjectSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Projektliste */}
+        <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col">
+          <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0">
+            <h3 className="text-lg font-medium text-gray-900">Projekt auswählen</h3>
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            <div className="divide-y divide-gray-200">
               {filteredProjects.map((project) => {
                 const c = customersById.get(project.customerID);
                 return (
                   <button
                     key={project.id}
                     onClick={() => handleProjectSelect(project)}
-                    className="w-full text-left flex items-center space-x-3 p-2 hover:bg-gray-50 cursor-pointer transition-colors rounded"
+                    className="w-full text-left flex items-center space-x-4 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    <Building className="h-4 w-4 text-gray-400" />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 text-sm">{project.name}</p>
-                      <p className="text-xs text-gray-600">
+                    <Building className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900">{project.name}</p>
+                      <p className="text-sm text-gray-500 truncate">
                         {getCustomerName(c)} • {project.status}
                       </p>
                     </div>
@@ -237,8 +255,12 @@ const BillOfMaterials = () => {
               })}
 
               {filteredProjects.length === 0 && (
-                <div className="text-center py-4 text-gray-500">
-                  <p className="text-sm">Keine Projekte gefunden</p>
+                <div className="text-center py-12">
+                  <Building className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Projekte gefunden</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Versuchen Sie andere Suchbegriffe.
+                  </p>
                 </div>
               )}
             </div>
@@ -250,104 +272,101 @@ const BillOfMaterials = () => {
 
   // ---- UI: Stückliste ----
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col space-y-6">
       {/* Header (nicht druckbar) */}
-      <div className="flex-shrink-0 border-b border-gray-200 p-6 print:hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <FileText className="h-8 w-8 text-blue-600" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Stückliste</h1>
+          <p className="mt-1 text-sm text-gray-600 hidden sm:block">
+            {selectedProject?.name}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleNewBOM}
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            title="Neues Projekt wählen"
+          >
+            Zurück
+          </button>
+          <button
+            onClick={handleRefreshFromBookings}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            title="Aus Buchungen aktualisieren"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline">Aktualisieren</span>
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            title="Drucken"
+          >
+            <Printer className="h-4 w-4" />
+            <span className="hidden sm:inline">Drucken</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Projekt-Info Card */}
+      <div className="bg-white rounded-lg shadow p-4 print:hidden">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-start space-x-3">
+            <Building className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Stückliste</h1>
-              <p className="text-gray-600">{selectedProject?.name}</p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Projekt</p>
+              <p className="font-medium text-gray-900">{selectedProject?.name || 'Unbekannt'}</p>
+              <p className="text-sm text-gray-500">Status: {selectedProject?.status || 'Unbekannt'}</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleNewBOM}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              title="Neues Projekt wählen"
-            >
-               Zurück
-            </button>
-            <button
-              onClick={handleRefreshFromBookings}
-              className="flex items-center space-x-2 px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 transition-colors"
-              title="Aus Buchungen aktualisieren"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span>Aktualisieren</span>
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              title="Drucken"
-            >
-              <Printer className="h-4 w-4" />
-              <span>Drucken</span>
-            </button>
+          <div className="flex items-start space-x-3">
+            <User className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Kunde</p>
+              <p className="font-medium text-gray-900">{getCustomerName(customer)}</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3">
+            <MapPin className="h-5 w-5 text-primary-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Adresse</p>
+              <p className="font-medium text-gray-900">{getCustomerAddress(customer)}</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Druckbarer Inhalt */}
-      <div className="flex-1 overflow-auto print:overflow-visible">
-        <div className="p-8 print:p-0 print:m-0">
-          {/* Kopf */}
-          <div className="mb-6 print:mb-2">
-            <div className="text-center mb-4 print:mb-1">
-              <h1 className="text-2xl font-bold text-gray-900 print:text-black print:text-lg">
-                STÜCKLISTE
-              </h1>
+      {/* Druckbarer Inhalt - Kopf */}
+      <div className="hidden print:block print:mb-2">
+        <div className="text-center mb-4 print:mb-1">
+          <h1 className="text-2xl font-bold text-gray-900 print:text-black print:text-lg">
+            STÜCKLISTE
+          </h1>
+        </div>
+        <div className="bg-gray-50 print:bg-white print:border print:border-gray-300 rounded-lg p-4 print:p-2">
+          <div className="text-sm space-y-1">
+            <div>
+              <span className="font-semibold">Projekt:</span> {selectedProject?.name || 'Unbekanntes Projekt'} ({selectedProject?.status || 'Unbekannt'})
             </div>
-
-            <div className="bg-gray-50 print:bg-white print:border print:border-gray-300 rounded-lg p-4 print:p-2">
-              {/* App-Ansicht */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Building className="h-4 w-4 text-gray-600" />
-                    <span className="font-semibold text-gray-900">Projekt:</span>
-                  </div>
-                  <p className="text-base font-medium text-gray-900">
-                    {selectedProject?.name || 'Unbekanntes Projekt'}
-                  </p>
-                  <p className="text-sm text-gray-600">Status: {selectedProject?.status || 'Unbekannt'}</p>
-                </div>
-
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <User className="h-4 w-4 text-gray-600" />
-                    <span className="font-semibold text-gray-900">Kunde:</span>
-                  </div>
-                  <p className="text-gray-900">{getCustomerName(customer)}</p>
-                </div>
-
-                <div>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <MapPin className="h-4 w-4 text-gray-600" />
-                    <span className="font-semibold text-gray-900">Adresse:</span>
-                  </div>
-                  <p className="text-gray-900">{getCustomerAddress(customer)}</p>
-                </div>
-              </div>
-
-              {/* Druck-Ansicht */}
-              <div className="hidden print:block text-sm space-y-1">
-                <div>
-                  <span className="font-semibold">Projekt:</span> {selectedProject?.name || 'Unbekanntes Projekt'} ({selectedProject?.status || 'Unbekannt'})
-                </div>
-                <div>
-                  <span className="font-semibold">Kunde:</span> {getCustomerName(customer)}
-                </div>
-                <div>
-                  <span className="font-semibold">Adresse:</span> {getCustomerAddress(customer)}
-                </div>
-              </div>
+            <div>
+              <span className="font-semibold">Kunde:</span> {getCustomerName(customer)}
+            </div>
+            <div>
+              <span className="font-semibold">Adresse:</span> {getCustomerAddress(customer)}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Tabellen - gruppiert nach Konfiguriert/Automatisch */}
-          <div className="bg-white print:bg-white space-y-6 print:space-y-4">
+      {/* Hauptinhalt - Tabellen */}
+      <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col print:shadow-none print:rounded-none">
+        <div className="px-6 py-4 border-b border-gray-200 flex-shrink-0 print:hidden">
+          <h3 className="text-lg font-medium text-gray-900">Materialliste</h3>
+          <p className="text-sm text-gray-500">{bomItems.length} Positionen</p>
+        </div>
+
+        <div className="flex-1 overflow-auto print:overflow-visible">
+          <div className="p-6 print:p-0 space-y-6 print:space-y-4">
             {(() => {
               const configuredItems = bomItems.filter(item => item.isConfigured);
               const autoItems = bomItems.filter(item => !item.isConfigured);
@@ -404,7 +423,7 @@ const BillOfMaterials = () => {
                                 type="number"
                                 value={item.quantity}
                                 onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                                className="print:hidden w-full px-2 py-1 border border-gray-300 rounded text-center text-sm"
+                                className="print:hidden w-full px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                 min="1"
                               />
                               <span className="hidden print:block text-center text-sm">
@@ -430,16 +449,19 @@ const BillOfMaterials = () => {
 
               return (
                 <>
-                  {renderTable(configuredItems, 'Konfigurierte Komponenten', 'bg-blue-50', 'border-blue-200', 0)}
+                  {renderTable(configuredItems, 'Konfigurierte Komponenten', 'bg-primary-50', 'border-primary-200', 0)}
                   {renderTable(autoItems, 'Automatisch berechnetes Material', 'bg-gray-50', 'border-gray-200', configuredItems.length)}
                 </>
               );
             })()}
 
             {bomItems.length === 0 && (
-              <div className="text-center py-8 text-gray-500 print:hidden">
-                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>Keine Materialien für dieses Projekt gebucht</p>
+              <div className="text-center py-12 print:hidden">
+                <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Materialien</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Für dieses Projekt wurden noch keine Materialien gebucht.
+                </p>
               </div>
             )}
           </div>
@@ -459,12 +481,12 @@ const BillOfMaterials = () => {
 
             /* Verstecke alle UI-Elemente außer Druckinhalt */
             nav, header, aside, .sidebar, [role="navigation"], [role="banner"] { display: none !important; }
-            
+
             /* Verstecke Sidebar und alle Navigations-Buttons */
             .fixed.top-4.left-4, .fixed.inset-0.z-40 { display: none !important; }
             button:not(.print-button), .menu-button, [data-testid*="menu"] { display: none !important; }
             .hamburger, .mobile-menu, .nav-toggle { display: none !important; }
-            
+
             /* Verstecke speziell das Hamburger-Menü der Sidebar */
             .lg\\:hidden button { display: none !important; }
 

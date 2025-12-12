@@ -549,67 +549,49 @@ const OrderManagement = () => {
   return (
     <div className="h-full flex flex-col space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bestellmanagement</h1>
-          <p className="text-gray-600">Materialien bestellen und Bestellstatus verwalten</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Bestellungen</h1>
+          <p className="text-gray-600 hidden sm:block">Materialien bestellen und Bestellstatus verwalten</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
           >
             <Plus className="h-4 w-4" />
-            <span>Material hinzufügen</span>
+            <span className="hidden sm:inline">Material hinzufügen</span>
+            <span className="sm:hidden">Neu</span>
           </button>
           <button
             onClick={openBulkOrderModal}
             disabled={isLoading || toOrderCount === 0}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <ShoppingCart className="h-4 w-4" />
-            <span>Alle niedrigen bestellen ({toOrderCount})</span>
+            <span className="hidden sm:inline">Alle bestellen ({toOrderCount})</span>
+            <span className="sm:hidden">{toOrderCount}</span>
           </button>
         </div>
       </div>
 
-      {/* Statistiken */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Zu bestellen</p>
-              <p className="text-2xl font-bold text-orange-600">{toOrderCount}</p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-orange-600" />
-          </div>
+      {/* Statistiken - Kompakt auf Mobile */}
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-1.5 md:gap-4">
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Bestellen</p>
+          <p className="text-base md:text-2xl font-bold text-orange-600">{toOrderCount}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Bestellt</p>
-              <p className="text-2xl font-bold text-blue-600">{orderedCount}</p>
-            </div>
-            <Clock className="h-8 w-8 text-blue-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Bestellt</p>
+          <p className="text-base md:text-2xl font-bold text-blue-600">{orderedCount}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Ausgeschlossen</p>
-              <p className="text-2xl font-bold text-amber-600">{excludedLowStockCount}</p>
-            </div>
-            <Shield className="h-8 w-8 text-amber-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Ausgeschl.</p>
+          <p className="text-base md:text-2xl font-bold text-amber-600">{excludedLowStockCount}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Gesamt Bestellliste</p>
-              <p className="text-2xl font-bold text-gray-900">{orderList.length}</p>
-            </div>
-            <Package className="h-8 w-8 text-gray-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Gesamt</p>
+          <p className="text-base md:text-2xl font-bold text-gray-900">{orderList.length}</p>
         </div>
       </div>
 
@@ -685,7 +667,74 @@ const OrderManagement = () => {
           </div>
         ) : (
           <div className="flex-1 overflow-hidden">
-            <div className="h-full overflow-auto">
+            {/* Mobile: Card-Liste */}
+            <div className="md:hidden h-full overflow-auto p-4 space-y-3">
+              {filteredOrderList.map((material, index) => (
+                <div
+                  key={`${material.id}-${material._displayType}-${index}`}
+                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{material.description}</p>
+                      <p className="text-sm text-gray-500">{material.materialID}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${getStatusColor(material)}`}>
+                      {getStatusText(material)}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500">Bestand:</span>
+                      <span className={`ml-1 font-medium ${material.stock < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                        {material.stock}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Menge:</span>
+                      <span className="ml-1 font-medium text-gray-900">{material._displayQuantity}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Preis:</span>
+                      <span className="ml-1 font-medium text-gray-900">{formatPrice(material.price)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    {material._displayType === 'ordered' ? (
+                      <button
+                        onClick={() => cancelOrder(material.id)}
+                        disabled={isLoading}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50 flex items-center space-x-1 text-sm"
+                      >
+                        <X className="h-4 w-4" />
+                        <span>Stornieren</span>
+                      </button>
+                    ) : material._displayType === 'additional' ? (
+                      <button
+                        onClick={() => openOrderModal(material, true)}
+                        disabled={isLoading}
+                        className="text-blue-600 hover:text-blue-900 disabled:opacity-50 flex items-center space-x-1 text-sm"
+                      >
+                        <Check className="h-4 w-4" />
+                        <span>Nachbestellen</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => openOrderModal(material, false)}
+                        disabled={isLoading}
+                        className="text-blue-600 hover:text-blue-900 disabled:opacity-50 flex items-center space-x-1 text-sm"
+                      >
+                        <Check className="h-4 w-4" />
+                        <span>Bestellen</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: Tabelle */}
+            <div className="hidden md:block h-full overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>

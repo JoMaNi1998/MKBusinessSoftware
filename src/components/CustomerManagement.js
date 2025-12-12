@@ -277,32 +277,29 @@ const CustomerManagement = () => {
   return (
     <div className="h-full flex flex-col space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Kundenverwaltung</h1>
-          <p className="mt-1 text-sm text-gray-600">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Kundenverwaltung</h1>
+          <p className="mt-1 text-sm text-gray-600 hidden sm:block">
             Verwalten Sie Ihre Kunden und deren Projekte
           </p>
         </div>
-        <button 
+        <button
           onClick={() => setIsAddModalOpen(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center space-x-2"
+          className="bg-primary-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center justify-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          <span>Kunde hinzufügen</span>
+          <span className="hidden sm:inline">Kunde hinzufügen</span>
+          <span className="sm:hidden">Neu</span>
         </button>
       </div>
 
-      {/* Statistiken */}
-      <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Gesamt Kunden</p>
-              <p className="text-2xl font-bold text-gray-900">{customers.length}</p>
-            </div>
-            <Users className="h-8 w-8 text-primary-600" />
-          </div>
+      {/* Statistiken - Kompakt */}
+      <div className="bg-white p-2 md:p-4 rounded-lg shadow inline-flex items-center gap-3">
+        <Users className="h-5 w-5 md:h-6 md:w-6 text-primary-600" />
+        <div>
+          <span className="text-base md:text-xl font-bold text-gray-900">{customers.length}</span>
+          <span className="text-xs md:text-sm text-gray-600 ml-2">Kunden</span>
         </div>
       </div>
 
@@ -392,9 +389,45 @@ const CustomerManagement = () => {
           </div>
         </div>
         
-        {/* Scrollbare Tabelle */}
+        {/* Scrollbare Tabelle / Mobile Cards */}
         <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-auto">
+          {/* Mobile: Card-Liste */}
+          <div className="md:hidden h-full overflow-auto p-4 space-y-3">
+            {filteredCustomers.map((customer) => (
+              <div
+                key={customer.id}
+                className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
+                onClick={() => handleCustomerClick(customer)}
+              >
+                <div className="flex justify-between items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{customer.firmennameKundenname}</p>
+                    <p className="text-sm text-gray-500">{customer.customerID}</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 mr-1 text-gray-400 flex-shrink-0" />
+                  <span className="truncate">{customer.street} {customer.houseNumber}, {customer.postalCode} {customer.city}</span>
+                </div>
+                {customer.phone && (
+                  <div className="mt-1 text-sm text-gray-500">{customer.phone}</div>
+                )}
+              </div>
+            ))}
+
+            {filteredCustomers.length === 0 && (
+              <div className="text-center py-12">
+                <Users className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Kunden gefunden</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {searchTerm ? 'Versuchen Sie andere Suchbegriffe.' : 'Beginnen Sie mit dem Hinzufügen Ihres ersten Kunden.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Tabelle */}
+          <div className="hidden md:block h-full overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>

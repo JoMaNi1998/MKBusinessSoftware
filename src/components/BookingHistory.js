@@ -167,57 +167,31 @@ const BookingHistory = () => {
     <div className="h-full flex flex-col space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Buchungshistorie</h1>
-          <p className="mt-1 text-sm text-gray-600">
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Buchungshistorie</h1>
+          <p className="mt-1 text-sm text-gray-600 hidden sm:block">
             Übersicht über alle Material-Buchungen und Bewegungen
           </p>
         </div>
       </div>
 
-      {/* Statistiken */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Gesamt Buchungen</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            </div>
-            <History className="h-8 w-8 text-primary-600" />
-          </div>
+      {/* Statistiken - Kompakt auf Mobile */}
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-1.5 md:gap-4">
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Gesamt</p>
+          <p className="text-base md:text-2xl font-bold text-gray-900">{stats.total}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Eingänge</p>
-              <p className="text-2xl font-bold text-green-600">
-                {stats.eingaenge}
-              </p>
-            </div>
-            <TrendingUp className="h-8 w-8 text-green-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Eingänge</p>
+          <p className="text-base md:text-2xl font-bold text-green-600">{stats.eingaenge}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Ausgänge</p>
-              <p className="text-2xl font-bold text-red-600">
-                {stats.ausgaenge}
-              </p>
-            </div>
-            <TrendingDown className="h-8 w-8 text-red-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Ausgänge</p>
+          <p className="text-base md:text-2xl font-bold text-red-600">{stats.ausgaenge}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Heute</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {stats.heute}
-              </p>
-            </div>
-            <Calendar className="h-8 w-8 text-blue-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Heute</p>
+          <p className="text-base md:text-2xl font-bold text-blue-600">{stats.heute}</p>
         </div>
       </div>
 
@@ -238,29 +212,27 @@ const BookingHistory = () => {
       {/* Buchungsliste */}
       <div className="bg-white rounded-lg shadow overflow-hidden flex-1 flex flex-col">
         {/* Fixierter Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border-b border-gray-200 flex-shrink-0 gap-3">
           <h3 className="text-lg font-medium text-gray-900">Buchungsliste</h3>
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="flex-1 sm:flex-none border border-gray-300 rounded-lg px-2 sm:px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="alle">Alle Zeiten</option>
+              <option value="alle">Alle</option>
               <option value="heute">Heute</option>
-              <option value="woche">Letzte Woche</option>
-              <option value="monat">Letzter Monat</option>
+              <option value="woche">Woche</option>
+              <option value="monat">Monat</option>
             </select>
-            <Filter className="h-4 w-4 text-gray-400" />
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="flex-1 sm:flex-none border border-gray-300 rounded-lg px-2 sm:px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
-              <option value="alle">Alle Buchungen</option>
-              <option value="Eingang">Nur Eingänge</option>
-              <option value="Ausgang">Nur Ausgänge</option>
+              <option value="alle">Alle</option>
+              <option value="Eingang">Eingänge</option>
+              <option value="Ausgang">Ausgänge</option>
             </select>
           </div>
         </div>

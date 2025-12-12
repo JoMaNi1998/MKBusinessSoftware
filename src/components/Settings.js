@@ -524,8 +524,8 @@ const Settings = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Einstellungen</h1>
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Einstellungen</h1>
           <p className="mt-1 text-sm text-gray-600">
             Verwalten Sie Ihre Anwendungseinstellungen und Präferenzen
           </p>

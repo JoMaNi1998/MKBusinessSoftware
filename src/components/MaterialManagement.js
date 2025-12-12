@@ -392,95 +392,70 @@ const MaterialManagement = () => {
   return (
     <div className="h-full flex flex-col space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Materialverwaltung</h1>
-          <p className="mt-1 text-sm text-gray-600">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Materialverwaltung</h1>
+          <p className="mt-1 text-sm text-gray-600 hidden sm:block">
             Verwalten Sie Ihre PV-Materialien und Bestände
           </p>
         </div>
-        <div className="flex space-x-3">
-          <div className="flex items-center space-x-3">
-            <button 
-              onClick={() => handleOpenBooking('Eingang')}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
-            >
-              <TrendingUp className="h-4 w-4" />
-              <span>Einbuchen</span>
-            </button>
-            <button 
-              onClick={() => handleOpenBooking('Ausgang')}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 flex items-center space-x-2"
-            >
-              <TrendingDown className="h-4 w-4" />
-              <span>Ausbuchen</span>
-            </button>
-            <button 
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center space-x-2"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Material hinzufügen</span>
-            </button>
-
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => handleOpenBooking('Eingang')}
+            className="flex-1 sm:flex-none bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Einbuchen</span>
+            <span className="sm:hidden">Ein</span>
+          </button>
+          <button
+            onClick={() => handleOpenBooking('Ausgang')}
+            className="flex-1 sm:flex-none bg-red-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
+          >
+            <TrendingDown className="h-4 w-4" />
+            <span className="hidden sm:inline">Ausbuchen</span>
+            <span className="sm:hidden">Aus</span>
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex-1 sm:flex-none bg-primary-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-primary-700 flex items-center justify-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Material hinzufügen</span>
+            <span className="sm:hidden">Neu</span>
+          </button>
         </div>
       </div>
 
-      {/* Statistiken */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Gesamt Materialien</p>
-              <p className="text-2xl font-bold text-gray-900">{materials.length}</p>
-            </div>
-            <Package className="h-8 w-8 text-primary-600" />
-          </div>
+      {/* Statistiken - Kompakt auf Mobile */}
+      <div className="grid grid-cols-5 md:grid-cols-5 gap-1.5 md:gap-4">
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Gesamt</p>
+          <p className="text-base md:text-2xl font-bold text-gray-900">{materials.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Auf Lager</p>
-              <p className="text-2xl font-bold text-green-600">
-                {materials.filter(m => m.stock > m.heatStock && m.orderStatus !== 'bestellt').length}
-              </p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-green-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Lager</p>
+          <p className="text-base md:text-2xl font-bold text-green-600">
+            {materials.filter(m => m.stock > m.heatStock && m.orderStatus !== 'bestellt').length}
+          </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Niedrig</p>
-              <p className="text-2xl font-bold text-orange-600">
-                {materials.filter(m => m.stock > 0 && m.stock <= m.heatStock && m.orderStatus !== 'bestellt').length}
-              </p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-orange-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Niedrig</p>
+          <p className="text-base md:text-2xl font-bold text-orange-600">
+            {materials.filter(m => m.stock > 0 && m.stock <= m.heatStock && m.orderStatus !== 'bestellt').length}
+          </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Bestellt</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {materials.filter(m => m.orderStatus === 'bestellt').length}
-              </p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-blue-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Bestellt</p>
+          <p className="text-base md:text-2xl font-bold text-blue-600">
+            {materials.filter(m => m.orderStatus === 'bestellt').length}
+          </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Nicht verfügbar</p>
-              <p className="text-2xl font-bold text-red-600">
-                {materials.filter(m => m.stock === 0).length}
-              </p>
-            </div>
-            <AlertTriangle className="h-8 w-8 text-red-600" />
-          </div>
+        <div className="bg-white p-2 md:p-4 rounded-lg shadow">
+          <p className="text-[10px] md:text-sm font-medium text-gray-600 truncate">Leer</p>
+          <p className="text-base md:text-2xl font-bold text-red-600">
+            {materials.filter(m => m.stock === 0).length}
+          </p>
         </div>
       </div>
 
@@ -550,9 +525,62 @@ const MaterialManagement = () => {
           </div>
         </div>
         
-        {/* Scrollbare Tabelle */}
+        {/* Scrollbare Tabelle / Mobile Cards */}
         <div className="flex-1 overflow-hidden">
-          <div className="h-full overflow-auto">
+          {/* Mobile: Card-Liste */}
+          <div className="md:hidden h-full overflow-auto p-4 space-y-3">
+            {filteredMaterials.map((material) => {
+              const categoryName = categories.find(cat => cat.id === material.categoryId)?.name || 'Unbekannt';
+              const stockStatus = getStockStatusText(material.stock, material.heatStock, material.orderStatus);
+              const stockColor = getStockStatusColor(material.stock, material.heatStock, material.orderStatus);
+
+              return (
+                <div
+                  key={material.id}
+                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
+                  onClick={() => handleMaterialClick(material)}
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{material.description}</p>
+                      <p className="text-sm text-gray-500">{material.materialID}</p>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${stockColor}`}>
+                      {material.stock} Stk
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                      {categoryName}
+                    </span>
+                    <span className="font-medium text-gray-900">
+                      {formatPrice(material.price) ? `${formatPrice(material.price)} €` : '-'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                    <span>{material.manufacturer || '-'}</span>
+                    <span className={`px-2 py-0.5 rounded-full ${stockColor}`}>{stockStatus}</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredMaterials.length === 0 && (
+              <div className="text-center py-12">
+                <Package className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Keine Materialien gefunden</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {searchTerm || selectedCategory !== 'alle'
+                    ? 'Versuchen Sie andere Suchbegriffe oder Filter.'
+                    : 'Beginnen Sie mit dem Hinzufügen Ihres ersten Materials.'
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Tabelle */}
+          <div className="hidden md:block h-full overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>

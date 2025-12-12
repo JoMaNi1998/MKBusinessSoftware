@@ -289,71 +289,41 @@ const InvoiceManagement = () => {
     <div className="h-full flex flex-col space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Rechnungen</h1>
-          <p className="text-sm text-gray-500">
+        <div className="pl-12 sm:pl-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Rechnungen</h1>
+          <p className="text-sm text-gray-500 hidden sm:block">
             {filteredInvoices.length} von {invoices.length} Rechnungen
           </p>
         </div>
         <button
           onClick={handleNewInvoice}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center text-sm font-medium"
+          className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 text-sm font-medium"
         >
-          <Plus className="h-4 w-4 mr-2" />
-          Neue Rechnung
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">Neue Rechnung</span>
+          <span className="sm:hidden">Neu</span>
         </button>
       </div>
 
-      {/* Statistik-Karten */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-shrink-0">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Gesamt</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            </div>
-            <div className="p-3 bg-gray-100 rounded-lg">
-              <FileText className="h-6 w-6 text-gray-600" />
-            </div>
-          </div>
+      {/* Statistik-Karten - Kompakt auf Mobile */}
+      <div className="grid grid-cols-4 md:grid-cols-4 gap-1.5 md:gap-4 flex-shrink-0">
+        <div className="bg-white rounded-lg border border-gray-200 p-2 md:p-4">
+          <p className="text-[10px] md:text-sm text-gray-500 truncate">Gesamt</p>
+          <p className="text-base md:text-2xl font-bold text-gray-900">{stats.total}</p>
         </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Offen</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {(stats.byStatus?.sent || 0) + (stats.byStatus?.overdue || 0)}
-              </p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Clock className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2 md:p-4">
+          <p className="text-[10px] md:text-sm text-gray-500 truncate">Offen</p>
+          <p className="text-base md:text-2xl font-bold text-blue-600">
+            {(stats.byStatus?.sent || 0) + (stats.byStatus?.overdue || 0)}
+          </p>
         </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Bezahlt</p>
-              <p className="text-2xl font-bold text-green-600">{stats.byStatus?.paid || 0}</p>
-            </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2 md:p-4">
+          <p className="text-[10px] md:text-sm text-gray-500 truncate">Bezahlt</p>
+          <p className="text-base md:text-2xl font-bold text-green-600">{stats.byStatus?.paid || 0}</p>
         </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Offener Betrag</p>
-              <p className="text-xl font-bold text-orange-600">{formatPrice(stats.openValue)}</p>
-            </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <Euro className="h-6 w-6 text-orange-600" />
-            </div>
-          </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-2 md:p-4">
+          <p className="text-[10px] md:text-sm text-gray-500 truncate">Offen €</p>
+          <p className="text-base md:text-xl font-bold text-orange-600">{formatPrice(stats.openValue)}</p>
         </div>
       </div>
 
@@ -436,7 +406,40 @@ const InvoiceManagement = () => {
           </div>
         ) : (
           <div className="flex-1 overflow-hidden">
-            <div className="h-full overflow-auto">
+            {/* Mobile: Card-Liste */}
+            <div className="md:hidden h-full overflow-auto p-4 space-y-3">
+              {filteredInvoices.map((invoice) => (
+                <div
+                  key={invoice.id}
+                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
+                  onClick={() => handleViewInvoice(invoice)}
+                >
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900">{invoice.invoiceNumber}</p>
+                      <p className="text-sm text-gray-500">{getCustomerName(invoice.customerID)}</p>
+                    </div>
+                    {getStatusBadge(invoice.status)}
+                  </div>
+                  <div className="mt-3 flex justify-between items-center text-sm">
+                    <span className="text-gray-500">
+                      {formatDate(invoice.invoiceDate)}
+                    </span>
+                    <span className="font-bold text-gray-900">
+                      {formatPrice(invoice.totals?.grossTotal)}
+                    </span>
+                  </div>
+                  {invoice.dueDate && (
+                    <div className="mt-1 text-xs text-gray-400">
+                      Fällig: {formatDate(invoice.dueDate)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: Tabelle */}
+            <div className="hidden md:block h-full overflow-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
