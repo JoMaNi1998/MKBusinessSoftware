@@ -399,18 +399,32 @@ const CustomerManagement = () => {
                 className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
                 onClick={() => handleCustomerClick(customer)}
               >
+                {/* Kunde (immer sichtbar) */}
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{customer.firmennameKundenname}</p>
                     <p className="text-sm text-gray-500">{customer.customerID}</p>
                   </div>
                 </div>
-                <div className="mt-2 flex items-center text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 mr-1 text-gray-400 flex-shrink-0" />
-                  <span className="truncate">{customer.street} {customer.houseNumber}, {customer.postalCode} {customer.city}</span>
-                </div>
-                {customer.phone && (
-                  <div className="mt-1 text-sm text-gray-500">{customer.phone}</div>
+
+                {/* Adresse */}
+                {visibleColumns.adresse && (
+                  <div className="mt-2 flex items-center text-sm text-gray-600">
+                    <MapPin className="h-4 w-4 mr-1 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">{customer.street} {customer.houseNumber}, {customer.postalCode} {customer.city}</span>
+                  </div>
+                )}
+
+                {/* Telefon + Email (vom ersten Ansprechpartner) */}
+                {(visibleColumns.telefon || visibleColumns.email) && (
+                  <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-500">
+                    {visibleColumns.telefon && customer.contacts?.[0]?.phone && (
+                      <span>{customer.contacts[0].phone}</span>
+                    )}
+                    {visibleColumns.email && customer.contacts?.[0]?.email && (
+                      <span className="truncate">{customer.contacts[0].email}</span>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -514,12 +528,12 @@ const CustomerManagement = () => {
                   )}
                   {visibleColumns.telefon && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {customer.phone || '-'}
+                      {customer.contacts?.[0]?.phone || '-'}
                     </td>
                   )}
                   {visibleColumns.email && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {customer.email || '-'}
+                      {customer.contacts?.[0]?.email || '-'}
                     </td>
                   )}
                   {visibleColumns.aktionen && (

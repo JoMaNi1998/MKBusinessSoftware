@@ -414,22 +414,38 @@ const InvoiceManagement = () => {
                   className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
                   onClick={() => handleViewInvoice(invoice)}
                 >
+                  {/* Header: Rechnung + Status */}
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900">{invoice.invoiceNumber}</p>
-                      <p className="text-sm text-gray-500">{getCustomerName(invoice.customerID)}</p>
+                      {visibleColumns.kunde && (
+                        <p className="text-sm text-gray-500">{getCustomerName(invoice.customerID)}</p>
+                      )}
                     </div>
-                    {getStatusBadge(invoice.status)}
+                    {visibleColumns.status && getStatusBadge(invoice.status)}
                   </div>
-                  <div className="mt-3 flex justify-between items-center text-sm">
-                    <span className="text-gray-500">
-                      {formatDate(invoice.invoiceDate)}
-                    </span>
-                    <span className="font-bold text-gray-900">
-                      {formatPrice(invoice.totals?.grossTotal)}
-                    </span>
-                  </div>
-                  {invoice.dueDate && (
+
+                  {/* Betrag + Datum */}
+                  {visibleColumns.betrag && (
+                    <div className="mt-3 flex justify-between items-center text-sm">
+                      <span className="text-gray-500">
+                        {formatDate(invoice.invoiceDate)}
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {formatPrice(invoice.totals?.grossTotal)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Angebot */}
+                  {visibleColumns.angebot && invoice.offerNumber && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      Angebot: {invoice.offerNumber}
+                    </div>
+                  )}
+
+                  {/* Fällig */}
+                  {visibleColumns.faellig && invoice.dueDate && (
                     <div className="mt-1 text-xs text-gray-400">
                       Fällig: {formatDate(invoice.dueDate)}
                     </div>

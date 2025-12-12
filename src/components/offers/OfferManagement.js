@@ -425,26 +425,39 @@ const OfferManagement = () => {
                   className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
                   onClick={() => handleViewOffer(offer)}
                 >
+                  {/* Header: Angebot + Status */}
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900">{offer.offerNumber}</p>
-                      <p className="text-sm text-gray-500">{getCustomerName(offer.customerID)}</p>
+                      {visibleColumns.kunde && (
+                        <p className="text-sm text-gray-500">{getCustomerName(offer.customerID)}</p>
+                      )}
                     </div>
-                    {getStatusBadge(offer.status)}
+                    {visibleColumns.status && getStatusBadge(offer.status)}
                   </div>
-                  {offer.projectID && (
+
+                  {/* Projekt */}
+                  {visibleColumns.projekt && offer.projectID && (
                     <div className="mt-2 text-sm text-gray-600">
                       {getProjectName(offer.projectID)}
                     </div>
                   )}
-                  <div className="mt-3 flex justify-between items-center text-sm">
-                    <span className="text-gray-500">
-                      {formatDate(offer.createdAt?.toDate?.() || offer.createdAt)}
-                    </span>
-                    <span className="font-bold text-gray-900">
-                      {formatPrice(offer.totals?.grossTotal)}
-                    </span>
-                  </div>
+
+                  {/* Datum + Betrag */}
+                  {(visibleColumns.datum || visibleColumns.betrag) && (
+                    <div className="mt-3 flex justify-between items-center text-sm">
+                      {visibleColumns.datum && (
+                        <span className="text-gray-500">
+                          {formatDate(offer.createdAt?.toDate?.() || offer.createdAt)}
+                        </span>
+                      )}
+                      {visibleColumns.betrag && (
+                        <span className="font-bold text-gray-900">
+                          {formatPrice(offer.totals?.grossTotal)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

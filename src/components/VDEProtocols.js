@@ -461,33 +461,66 @@ const VDEProtocols = () => {
                   className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50"
                   onClick={() => handleEditProtocol(protocol.id)}
                 >
+                  {/* Header: Protokoll-Nr + Kunde + Status */}
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">{protocol.protocolNumber}</p>
-                      <p className="text-sm text-gray-500">{protocol.customerName || 'Kein Kunde'}</p>
+                      {visibleColumns.customerName && (
+                        <p className="text-sm text-gray-500">{protocol.customerName || 'Kein Kunde'}</p>
+                      )}
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${getStatusColor(protocol.status)}`}>
                       {protocol.status || 'Erstellt'}
                     </span>
                   </div>
-                  <div className="mt-2 text-sm text-gray-600">
-                    <Building className="h-4 w-4 inline mr-1 text-gray-400" />
-                    {protocol.projectName || 'Kein Projekt'}
-                  </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">kWp:</span>
-                      <span className="ml-1 font-medium text-gray-900">{protocol.power || '-'}</span>
+
+                  {/* Projekt */}
+                  {visibleColumns.projectName && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      <Building className="h-4 w-4 inline mr-1 text-gray-400" />
+                      {protocol.projectName || 'Kein Projekt'}
                     </div>
-                    <div>
-                      <span className="text-gray-500">Module:</span>
-                      <span className="ml-1 font-medium text-gray-900">{protocol.moduleCount || '-'}</span>
+                  )}
+
+                  {/* Technische Daten */}
+                  {(visibleColumns.power || visibleColumns.moduleCount || visibleColumns.stringCount) && (
+                    <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                      {visibleColumns.power && (
+                        <div>
+                          <span className="text-gray-500">kWp:</span>
+                          <span className="ml-1 font-medium text-gray-900">{protocol.power || '-'}</span>
+                        </div>
+                      )}
+                      {visibleColumns.moduleCount && (
+                        <div>
+                          <span className="text-gray-500">Module:</span>
+                          <span className="ml-1 font-medium text-gray-900">{protocol.moduleCount || '-'}</span>
+                        </div>
+                      )}
+                      {visibleColumns.stringCount && (
+                        <div>
+                          <span className="text-gray-500">Strings:</span>
+                          <span className="ml-1 font-medium text-gray-900">{protocol.stringCount || '-'}</span>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <span className="text-gray-500">Strings:</span>
-                      <span className="ml-1 font-medium text-gray-900">{protocol.stringCount || '-'}</span>
+                  )}
+
+                  {/* Zusätzliche Felder: Wechselrichter, Erstellt */}
+                  {(visibleColumns.inverterModel || visibleColumns.createdDate) && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+                      {visibleColumns.inverterModel && protocol.inverterModel && (
+                        <span className="bg-gray-100 px-2 py-0.5 rounded">
+                          WR: {protocol.inverterModel}
+                        </span>
+                      )}
+                      {visibleColumns.createdDate && (
+                        <span className="bg-gray-100 px-2 py-0.5 rounded">
+                          {formatDate(protocol.createdDate)}
+                        </span>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
               ))
             )}
