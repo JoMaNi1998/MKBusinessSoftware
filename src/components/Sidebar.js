@@ -14,7 +14,7 @@ import {
   FileSpreadsheet,
   Receipt
 } from 'lucide-react';
-import UserAvatar from './UserAvatar';
+import { UserAvatar } from './shared';
 import { useRoleSafe } from '../context/RoleContext';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -101,16 +101,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
           </div>
         </nav>
 
-        <div className="absolute bottom-0 w-full p-4 space-y-3">
-          {/* User Avatar */}
-          <div className="flex justify-center">
-            <UserAvatar />
-          </div>
-
-          {/* Version Info */}
-          <div className="bg-gray-50 rounded-lg p-3 text-center">
-            <p className="text-xs text-gray-500">Version 1.0.0</p>
-            <p className="text-xs text-gray-500">© 2024 Lagermanagement</p>
+        <div className="absolute bottom-0 w-full p-2">
+          <div className="flex items-center gap-2 px-2 py-1.5">
+            <UserAvatar size="sm" />
+            <div className="text-[10px] text-gray-400 leading-tight">
+              <p>v1.0.0 · © 2024</p>
+            </div>
           </div>
         </div>
       </div>

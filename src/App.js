@@ -12,22 +12,24 @@ import { CompanyProvider } from './context/CompanyContext';
 import { ServiceCatalogProvider } from './context/ServiceCatalogContext';
 import { OfferProvider } from './context/OfferContext';
 import { InvoiceProvider } from './context/InvoiceContext';
+import { ConfiguratorProvider } from './context/ConfiguratorContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
-import MaterialManagement from './components/MaterialManagement';
-import OrderManagement from './components/OrderManagement';
-import CustomerManagement from './components/CustomerManagement';
-import ProjectManagement from './components/ProjectManagement';
-import BookingHistory from './components/BookingHistory';
-import BillOfMaterials from './components/BillOfMaterials';
-import VDEProtocols from './components/VDEProtocols';
-import PVConfigurator from './components/PVConfigurator';
+import { MaterialManagement } from './components/material';
+import { OrderManagement } from './components/orders';
+import CustomerManagement from './components/customers/CustomerManagement';
+import { ProjectManagement } from './components/projects';
+import { BookingHistory } from './components/bookings';
+import BillOfMaterials from './components/bill-of-materials';
+import VDEProtocols from './components/vde-protocols';
+import ConfiguratorManagement from './components/pv-configurator/ConfiguratorManagement';
+import PVConfigurator from './components/pv-configurator/PVConfigurator';
 import OfferManagement from './components/offers/OfferManagement';
 import OfferConfigurator from './components/offers/OfferConfigurator';
 import InvoiceManagement from './components/invoices/InvoiceManagement';
 import InvoiceConfigurator from './components/invoices/InvoiceConfigurator';
-import Settings from './components/Settings';
-import UserAvatar from './components/UserAvatar';
+import Settings from './components/settings';
+import { UserAvatar } from './components/shared';
 import Sidebar from './components/Sidebar';
 
 function App() {
@@ -46,6 +48,7 @@ function App() {
                 <ServiceCatalogProvider>
                 <OfferProvider>
                 <InvoiceProvider>
+                <ConfiguratorProvider>
                 <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                   <div className="min-h-dvh bg-gray-50">
                     <Routes>
@@ -65,7 +68,9 @@ function App() {
                                   <Route path="/bookings" element={<div className="p-6 h-full"><BookingHistory /></div>} />
                                   <Route path="/bill-of-materials" element={<div className="p-6 h-full"><BillOfMaterials /></div>} />
                                   <Route path="/vde-protocols" element={<div className="p-6 h-full"><VDEProtocols /></div>} />
-                                  <Route path="/pv-configurator" element={<PVConfigurator />} />
+                                  <Route path="/pv-configurator" element={<div className="p-6 h-full"><ConfiguratorManagement /></div>} />
+                                  <Route path="/pv-configurator/new" element={<PVConfigurator />} />
+                                  <Route path="/pv-configurator/:id" element={<PVConfigurator />} />
                                   <Route path="/offers" element={<div className="p-6 h-full"><OfferManagement /></div>} />
                                   <Route path="/offers/new" element={<OfferConfigurator />} />
                                   <Route path="/offers/:id" element={<OfferConfigurator />} />
@@ -83,6 +88,7 @@ function App() {
                     </Routes>
                   </div>
                 </Router>
+                </ConfiguratorProvider>
                 </InvoiceProvider>
                 </OfferProvider>
                 </ServiceCatalogProvider>

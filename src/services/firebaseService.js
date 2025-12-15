@@ -69,7 +69,8 @@ export const COLLECTIONS = {
   SERVICE_CATALOG: 'service-catalog',
   OFFERS: 'offers',
   OFFER_TEMPLATES: 'offer-templates',
-  INVOICES: 'invoices'
+  INVOICES: 'invoices',
+  PV_CONFIGURATIONS: 'pv-configurations'
 };
 
 // Generic CRUD Operations
@@ -597,6 +598,74 @@ export class InvoiceService {
       console.error('Error generating invoice number:', error);
       const timestamp = Date.now();
       return `RE-${new Date().getFullYear()}-${timestamp}`;
+    }
+  }
+}
+
+// PV Configurator Service
+export class ConfiguratorService {
+  static async getAllConfigurations() {
+    return FirebaseService.getDocuments(COLLECTIONS.PV_CONFIGURATIONS, 'createdAt');
+  }
+
+  static async getConfiguration(configId) {
+    return FirebaseService.getDocument(COLLECTIONS.PV_CONFIGURATIONS, configId);
+  }
+
+  static async addConfiguration(configData) {
+    return FirebaseService.addDocument(COLLECTIONS.PV_CONFIGURATIONS, configData);
+  }
+
+  static async updateConfiguration(configId, configData) {
+    return FirebaseService.updateDocument(COLLECTIONS.PV_CONFIGURATIONS, configId, configData);
+  }
+
+  static async deleteConfiguration(configId) {
+    return FirebaseService.deleteDocument(COLLECTIONS.PV_CONFIGURATIONS, configId);
+  }
+
+  static subscribeToConfigurations(callback) {
+    return FirebaseService.subscribeToCollection(COLLECTIONS.PV_CONFIGURATIONS, callback, 'createdAt');
+  }
+
+  static async getConfigurationsByCustomer(customerId) {
+    return FirebaseService.queryDocuments(COLLECTIONS.PV_CONFIGURATIONS, 'customerID', '==', customerId);
+  }
+
+  static async getConfigurationsByProject(projectId) {
+    return FirebaseService.queryDocuments(COLLECTIONS.PV_CONFIGURATIONS, 'projectID', '==', projectId);
+  }
+
+  static async getConfigurationsByStatus(status) {
+    return FirebaseService.queryDocuments(COLLECTIONS.PV_CONFIGURATIONS, 'status', '==', status);
+  }
+
+  static async getNextConfigNumber() {
+    try {
+      const currentYear = new Date().getFullYear();
+      const configs = await this.getAllConfigurations();
+
+      // Filter configs from current year and find highest number
+      const yearConfigs = configs.filter(c => {
+        const configYear = c.configNumber?.match(/\d{4}/)?.[0];
+        return configYear === String(currentYear);
+      });
+
+      let maxNumber = 0;
+      yearConfigs.forEach(c => {
+        const match = c.configNumber?.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNumber) maxNumber = num;
+        }
+      });
+
+      const nextNumber = String(maxNumber + 1).padStart(4, '0');
+      return `KONF-${currentYear}-${nextNumber}`;
+    } catch (error) {
+      console.error('Error generating config number:', error);
+      const timestamp = Date.now();
+      return `KONF-${new Date().getFullYear()}-${timestamp}`;
     }
   }
 }
