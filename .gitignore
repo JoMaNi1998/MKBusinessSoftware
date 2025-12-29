@@ -5,6 +5,9 @@ node_modules/
 build/
 dist/
 
+# Generated Service Worker (compiled from src/service-worker.ts)
+public/service-worker.js
+
 # Environment
 .env
 .env.local

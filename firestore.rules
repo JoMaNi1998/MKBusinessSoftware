@@ -1,10 +1,162 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Development-Regeln: Erlaubt alle Lese-/Schreibzugriffe
-    // ⚠️ WICHTIG: Für Production müssen sichere Regeln implementiert werden!
+
+    // ==========================================
+    // Helper Functions
+    // ==========================================
+
+    // Prüft ob User authentifiziert ist
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Prüft ob User der Owner ist
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Prüft ob User Admin ist (Role im User-Dokument)
+    function isAdmin() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Prüft ob die Felder createdAt/updatedAt nicht manipuliert werden
+    function validTimestamps() {
+      return !request.resource.data.keys().hasAny(['createdAt']) &&
+             request.resource.data.updatedAt == request.time;
+    }
+
+    // ==========================================
+    // Collections - Nur authentifizierte User
+    // ==========================================
+
+    // Materialien
+    match /materials/{materialId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Kunden
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Angebote
+    match /offers/{offerId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Rechnungen
+    match /invoices/{invoiceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Projekte
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Buchungen/Lagerbewegungen
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Kategorien
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Konfigurationen
+    match /configurations/{configId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // ==========================================
+    // Settings - Nur Admins dürfen schreiben
+    // ==========================================
+
+    // Kalkulationseinstellungen
+    match /calculation-settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Firmeneinstellungen
+    match /company-settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // User-spezifische Daten
+    // ==========================================
+
+    // User Dokumente
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // User Preferences - nur eigene
+    match /user-preferences/{prefId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      // Optional: Stricter - nur eigene Preferences
+      // allow read, write: if isAuthenticated() && prefId.matches('.*-' + request.auth.uid);
+    }
+
+    // ==========================================
+    // Counter Dokumente (für Nummern-Generierung)
+    // ==========================================
+
+    match /counters/{counterId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      // Counter werden via Transactions aktualisiert
+    }
+
+    // ==========================================
+    // Audit Logs (Optional für Zukunft)
+    // ==========================================
+
+    match /audit-logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Nur via Cloud Functions
+    }
+
+    // ==========================================
+    // Fallback - Alles andere blockieren
+    // ==========================================
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
