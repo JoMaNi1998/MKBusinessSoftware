@@ -35,13 +35,14 @@ cd functions && npm run serve   # Lokal testen
 
 Bei Erstellung neuer Dateien in folgenden Ordnern **MUSS** diese Datei aktualisiert werden:
 
-| Ordner | Aktion |
-|--------|--------|
+| Ordner / Änderung | Aktion |
+|-------------------|--------|
 | `src/hooks/` | Neuen Hook in Tabelle "Hooks" eintragen |
 | `src/services/` | Neuen Service in Tabelle "Services" eintragen |
 | `src/types/` | Neue Type-Datei in Tabelle "Types" eintragen |
 | `src/utils/` | Neue Util-Datei in Tabelle "Utils" eintragen |
 | `src/context/` | Neuen Context in Tabelle "Contexts" eintragen |
+| Neue Firestore Collection | Regel in `firestore.rules` hinzufügen + Tabelle "Firestore Collections" aktualisieren |
 
 ---
 

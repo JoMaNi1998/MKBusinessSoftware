@@ -6,104 +6,127 @@ service cloud.firestore {
     // Helper Functions
     // ==========================================
 
-    // Prüft ob User authentifiziert ist
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Prüft ob User der Owner ist
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // Prüft ob User Admin ist (Role im User-Dokument)
     function isAdmin() {
       return isAuthenticated() &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isProjektleiterOrAdmin() {
+      return isAuthenticated() &&
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'projektleiter');
+    }
+
     // ==========================================
-    // Collections - Nur authentifizierte User
+    // ADMIN: Vollzugriff auf ALLES
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // ==========================================
+    // MONTEUR-ZUGRIFF: Diese 5 Collections sind für alle authentifizierten User
+    // (projects, materials, bookings, vde-protocols, project-photos)
     // ==========================================
 
-    // Materialien
-    match /materials/{materialId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // Kunden
-    match /customers/{customerId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // Angebote
-    match /offers/{offerId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // Rechnungen
-    match /invoices/{invoiceId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // Projekte
+    // Projekte (alle authentifizierten User - Monteur sieht nur zugewiesene via Frontend)
     match /projects/{projectId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isProjektleiterOrAdmin();
       allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow delete: if isProjektleiterOrAdmin();
     }
 
-    // Buchungen/Lagerbewegungen
+    // Materialien (alle authentifizierten User)
+    match /materials/{materialId} {
+      allow read: if isAuthenticated();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isAuthenticated();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // Buchungen/Lagerbewegungen (alle authentifizierten User)
     match /bookings/{bookingId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow delete: if isProjektleiterOrAdmin();
     }
 
-    // Kategorien
-    match /categories/{categoryId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // Spezifikationen
-    match /specifications/{specId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // Konfigurationen
-    match /configurations/{configId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
-    }
-
-    // VDE-Protokolle
+    // VDE-Protokolle (alle authentifizierten User)
     match /vde-protocols/{protocolId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // Projekt-Fotos (alle authentifizierten User)
+    match /project-photos/{photoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if isAuthenticated();
+    }
+
+    // ==========================================
+    // NUR PROJEKTLEITER/ADMIN: Folgende Collections
+    // ==========================================
+
+    // Kunden (nur Projektleiter/Admin)
+    match /customers/{customerId} {
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // Angebote (nur Projektleiter/Admin)
+    match /offers/{offerId} {
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // Rechnungen (nur Projektleiter/Admin)
+    match /invoices/{invoiceId} {
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // Kategorien (nur Projektleiter/Admin)
+    match /categories/{categoryId} {
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // Spezifikationen (nur Projektleiter/Admin)
+    match /specifications/{specId} {
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // Konfigurationen (nur Projektleiter/Admin)
+    match /configurations/{configId} {
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
     }
 
     // ==========================================
@@ -146,10 +169,10 @@ service cloud.firestore {
     // Counter Dokumente (für Nummern-Generierung)
     // ==========================================
 
+    // Counter werden für Nummern-Generierung benötigt (nur Projektleiter/Admin)
     match /counters/{counterId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-      // Counter werden via Transactions aktualisiert
+      allow read: if isProjektleiterOrAdmin();
+      allow write: if isProjektleiterOrAdmin();
     }
 
     // ==========================================
@@ -171,28 +194,31 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // PV-Konfigurationen
+    // PV-Konfigurationen (nur Projektleiter/Admin)
     match /pv-configurations/{configId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
     }
 
-    // Projekt-Fotos
-    match /project-photos/{photoId} {
+    // Projekt-Konfigurationen (nur Projektleiter/Admin)
+    match /project-configurations/{configId} {
+      allow read: if isProjektleiterOrAdmin();
+      allow create: if isProjektleiterOrAdmin();
+      allow update: if isProjektleiterOrAdmin();
+      allow delete: if isProjektleiterOrAdmin();
+    }
+
+    // PV-Defaults (Standard-Einstellungen für PV-Konfigurator)
+    match /pv-defaults/{defaultId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     // ==========================================
-    // Fallback - Alles andere blockieren
+    // Fallback - Nicht-Admins: Alles andere blockieren
     // ==========================================
-
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // (Admins haben bereits oben Vollzugriff)
   }
 }
