@@ -35,17 +35,18 @@ import Sidebar from './components/Sidebar';
 import { MonteurLayout } from './components/monteur';
 
 /**
- * RoleBasedRedirect - Leitet zur Startseite basierend auf Rolle
+ * RoleBasedRedirect - Leitet zur Startseite basierend auf Permissions
  */
 const RoleBasedRedirect: React.FC = () => {
-  const { userRole, loading } = useRoleSafe();
+  const { permissions, loading } = useRoleSafe();
 
   if (loading) {
     return null;
   }
 
-  // Monteure zu /monteur, alle anderen zu /materials
-  if (userRole === 'monteur') {
+  // User mit nur 'monteur' Permission → zu /monteur
+  const hasOnlyMonteurAccess = permissions.length === 1 && permissions.includes('monteur');
+  if (hasOnlyMonteurAccess) {
     return <Navigate to="/monteur" replace />;
   }
 
@@ -53,10 +54,11 @@ const RoleBasedRedirect: React.FC = () => {
 };
 
 /**
- * MonteurGuard - Blockiert Monteure vom Zugriff auf Haupt-App
+ * MonteurGuard - Prüft ob User Zugriff auf Haupt-App hat
+ * Basiert auf Permissions (Single Source of Truth aus Cloud Functions)
  */
 const MonteurGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { userRole, loading } = useRoleSafe();
+  const { permissions, loading } = useRoleSafe();
 
   if (loading) {
     return (
@@ -66,8 +68,9 @@ const MonteurGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     );
   }
 
-  // Monteure haben keinen Zugriff auf Haupt-App → zu /monteur umleiten
-  if (userRole === 'monteur') {
+  // User mit nur 'monteur' Permission → zu /monteur umleiten
+  const hasOnlyMonteurAccess = permissions.length === 1 && permissions.includes('monteur');
+  if (hasOnlyMonteurAccess) {
     return <Navigate to="/monteur" replace />;
   }
 

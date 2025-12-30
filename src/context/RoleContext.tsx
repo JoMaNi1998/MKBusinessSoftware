@@ -66,14 +66,14 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
         setUserRole(claims.role as string);
         setPermissions((claims.permissions as string[]) || []);
       } else {
-        // Fallback: Standard-Monteur-Rolle
+        // Fallback: Standard-Monteur-Rolle (nur monteur Permission)
         setUserRole(UserRole.MONTEUR);
-        setPermissions(['materials', 'vde', 'customers', 'projects']);
+        setPermissions(['monteur']);
       }
     } catch (error) {
       console.error('Fehler beim Laden der User-Rolle:', error);
       setUserRole(UserRole.MONTEUR);
-      setPermissions(['materials', 'vde', 'customers', 'projects']);
+      setPermissions(['monteur']);
     } finally {
       setLoading(false);
     }

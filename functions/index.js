@@ -13,7 +13,7 @@ const ROLES = {
   },
   monteur: {
     name: 'Monteur',
-    permissions: ['materials', 'vde', 'customers', 'projects']
+    permissions: ['monteur']
   },
   projektleiter: {
     name: 'Projektleiter',
