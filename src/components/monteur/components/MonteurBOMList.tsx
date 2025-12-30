@@ -10,6 +10,8 @@ interface BOMSectionProps {
   borderColor: string;
   iconColor: string;
   defaultExpanded?: boolean;
+  completedItems?: Set<string>;
+  onToggleCompleted?: (materialId: string) => void;
 }
 
 /**
@@ -22,7 +24,9 @@ const BOMSection: React.FC<BOMSectionProps> = ({
   bgColor,
   borderColor,
   iconColor,
-  defaultExpanded = true
+  defaultExpanded = true,
+  completedItems = new Set(),
+  onToggleCompleted
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -50,23 +54,37 @@ const BOMSection: React.FC<BOMSectionProps> = ({
       {/* Items */}
       {isExpanded && (
         <div className="divide-y divide-gray-100">
-          {items.map((item) => (
-            <div
-              key={item.materialId}
-              className="bg-white px-4 py-3 flex items-center justify-between"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">
-                  {item.description}
-                </p>
-                <p className="text-sm text-gray-500">{item.materialID}</p>
+          {items.map((item) => {
+            const isCompleted = completedItems.has(item.materialId);
+            return (
+              <div
+                key={item.materialId}
+                onClick={() => onToggleCompleted?.(item.materialId)}
+                className={`bg-white px-4 py-3 flex items-center justify-between cursor-pointer active:bg-gray-50 transition-opacity ${
+                  isCompleted ? 'opacity-50' : ''
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium truncate ${
+                    isCompleted ? 'line-through text-gray-500' : 'text-gray-900'
+                  }`}>
+                    {item.description}
+                  </p>
+                  <p className={`text-sm ${
+                    isCompleted ? 'line-through text-gray-400' : 'text-gray-500'
+                  }`}>{item.materialID}</p>
+                </div>
+                <div className="flex-shrink-0 ml-3 text-right">
+                  <p className={`font-semibold ${
+                    isCompleted ? 'line-through text-gray-500' : 'text-gray-900'
+                  }`}>{item.netQuantity}</p>
+                  <p className={`text-xs ${
+                    isCompleted ? 'text-gray-400' : 'text-gray-500'
+                  }`}>{item.unit}</p>
+                </div>
               </div>
-              <div className="flex-shrink-0 ml-3 text-right">
-                <p className="font-semibold text-gray-900">{item.netQuantity}</p>
-                <p className="text-xs text-gray-500">{item.unit}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -77,6 +95,8 @@ interface MonteurBOMListProps {
   configuredItems: AggregatedMaterial[];
   autoItems: AggregatedMaterial[];
   manualItems: AggregatedMaterial[];
+  completedItems?: Set<string>;
+  onToggleCompleted?: (materialId: string) => void;
 }
 
 /**
@@ -86,11 +106,15 @@ interface MonteurBOMListProps {
  * - Konfiguriert (aus PV-Konfigurator)
  * - Automatisch (berechnet aus Buchungen)
  * - Manuell (händisch hinzugefügt)
+ *
+ * Unterstützt Durchstreichen-Funktion durch Klick auf Item.
  */
 const MonteurBOMList: React.FC<MonteurBOMListProps> = ({
   configuredItems,
   autoItems,
-  manualItems
+  manualItems,
+  completedItems = new Set(),
+  onToggleCompleted
 }) => {
   const totalCount = configuredItems.length + autoItems.length + manualItems.length;
 
@@ -116,6 +140,8 @@ const MonteurBOMList: React.FC<MonteurBOMListProps> = ({
         borderColor="border-primary-200"
         iconColor="text-primary-600"
         defaultExpanded={true}
+        completedItems={completedItems}
+        onToggleCompleted={onToggleCompleted}
       />
 
       <BOMSection
@@ -126,6 +152,8 @@ const MonteurBOMList: React.FC<MonteurBOMListProps> = ({
         borderColor="border-gray-200"
         iconColor="text-gray-600"
         defaultExpanded={true}
+        completedItems={completedItems}
+        onToggleCompleted={onToggleCompleted}
       />
 
       <BOMSection
@@ -136,6 +164,8 @@ const MonteurBOMList: React.FC<MonteurBOMListProps> = ({
         borderColor="border-green-200"
         iconColor="text-green-600"
         defaultExpanded={true}
+        completedItems={completedItems}
+        onToggleCompleted={onToggleCompleted}
       />
     </div>
   );

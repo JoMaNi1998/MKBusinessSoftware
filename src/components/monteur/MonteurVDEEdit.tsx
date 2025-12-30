@@ -135,12 +135,7 @@ const MonteurVDEEdit: React.FC = () => {
       {/* Sticky Header mit Speichern */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 safe-area-top">
         <div className="flex items-center justify-between">
-          <button
-            onClick={handleBack}
-            className="p-2 -ml-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
-          >
-            <ChevronLeft className="h-5 w-5 text-gray-600" />
-          </button>
+          <div className="w-10" />
 
           <div className="text-center flex-1">
             <h2 className="font-medium text-gray-900 text-sm">

@@ -77,6 +77,14 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
     }
 
+    // BOM Erledigte Items - Monteur Stückliste Durchstreichen (alle authentifizierten User)
+    match /bom-completed-items/{itemId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
     // ==========================================
     // NUR PROJEKTLEITER/ADMIN: Folgende Collections
     // ==========================================

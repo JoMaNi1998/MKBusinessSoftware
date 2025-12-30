@@ -158,8 +158,8 @@ const MonteurProjectDetail: React.FC = () => {
         )}
       </div>
 
-      {/* Aktions-Karten - Mobile First: untereinander */}
-      <div className="flex flex-col gap-3">
+      {/* Aktions-Karten - 2x2 Grid */}
+      <div className="grid grid-cols-2 gap-3">
         <ProjectActionCard
           icon={Camera}
           title="Fotos"

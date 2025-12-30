@@ -132,6 +132,7 @@ src/
 | `BookingAggregationService.ts` | `aggregateProjectBookings`, `validateProjectInBooking`, `getMaxReturnableQuantity`, `splitAggregatedByCategory` |
 | `InvoiceService.ts` | `getAllInvoices`, `getInvoice`, `addInvoice`, `updateInvoice`, `deleteInvoice`, `getNextInvoiceNumber` |
 | `BOMService.ts` | `getBOM`, `createBOM`, `updateBOM`, `deleteBOM` |
+| `BOMCompletedService.ts` | `getCompletedItems`, `markAsCompleted`, `markAsIncomplete`, `toggleCompleted`, `subscribeToCompletedItems` |
 
 ---
 
@@ -295,6 +296,7 @@ src/components/[feature]/
 | `user-preferences` | Spalten-Einstellungen | Auth |
 | `calculation-settings` | Kalkulationseinstellungen | Read: Auth, Write: Admin |
 | `company-settings` | Firmeneinstellungen | Read: Auth, Write: Admin |
+| `bom-completed-items` | Durchgestrichene Stücklisten-Items (Monteur) | Auth |
 
 ---
 

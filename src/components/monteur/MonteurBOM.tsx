@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { useMonteurBOM } from './hooks/useMonteurBOM';
 import MonteurBOMList from './components/MonteurBOMList';
 
@@ -18,7 +18,9 @@ const MonteurBOM: React.FC = () => {
     autoItems,
     manualItems,
     totalCount,
-    loading
+    loading,
+    completedItems,
+    toggleItemCompleted
   } = useMonteurBOM();
 
   // Loading State
@@ -59,12 +61,6 @@ const MonteurBOM: React.FC = () => {
       {/* Header */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 -ml-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5 text-warning-600" />
@@ -87,6 +83,8 @@ const MonteurBOM: React.FC = () => {
         configuredItems={configuredItems}
         autoItems={autoItems}
         manualItems={manualItems}
+        completedItems={completedItems}
+        onToggleCompleted={toggleItemCompleted}
       />
     </div>
   );
