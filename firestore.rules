@@ -22,12 +22,6 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Prüft ob die Felder createdAt/updatedAt nicht manipuliert werden
-    function validTimestamps() {
-      return !request.resource.data.keys().hasAny(['createdAt']) &&
-             request.resource.data.updatedAt == request.time;
-    }
-
     // ==========================================
     // Collections - Nur authentifizierte User
     // ==========================================

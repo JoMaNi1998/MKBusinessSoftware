@@ -1,8 +1,9 @@
 /**
  * BOMSection Print Styles
- * Direkter Print-CSS Ansatz für mehrseitigen A4 Druck
+ * Portal-basierter Druck für mehrseitigen A4 Druck
  *
- * WICHTIG: Versteckt ALLES außer .bom-print-container
+ * Das Portal (#bom-print-portal) wird außerhalb von #root gerendert.
+ * Beim Drucken wird #root versteckt und nur das Portal angezeigt.
  */
 
 @media print {
@@ -11,213 +12,167 @@
     margin: 10mm;
   }
 
-  /* ===== ALLES VERSTECKEN ===== */
-  body > * {
+  /* ===== ALLES AUßER PORTAL VERSTECKEN ===== */
+  body > *:not(#bom-print-portal) {
     display: none !important;
   }
 
-  /* Root-Container der App verstecken */
+  /* #root explizit verstecken */
   #root {
     display: none !important;
   }
 
-  /* ===== NUR BOM-CONTAINER ZEIGEN ===== */
-  /* Pfad zum BOM-Container sichtbar machen */
-  body,
-  #root,
-  #root > *,
-  .fixed.inset-0,
-  [role="dialog"],
-  .overflow-y-auto,
-  .bom-print-container {
+  /* ===== PORTAL SICHTBAR MACHEN ===== */
+  #bom-print-portal {
     display: block !important;
-    position: static !important;
-    overflow: visible !important;
-    height: auto !important;
-    max-height: none !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     width: 100% !important;
-    max-width: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
     background: white !important;
-    transform: none !important;
   }
 
-  /* Modal-Backdrop entfernen */
-  .fixed.inset-0.bg-black,
-  .fixed.inset-0.bg-gray-500,
-  [class*="backdrop"],
-  [class*="overlay"] {
-    display: none !important;
+  /* ===== GRUNDEINSTELLUNGEN ===== */
+  html, body {
+    background: white !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* Sidebar komplett verstecken */
-  aside,
-  nav,
-  .sidebar,
-  .fixed.inset-y-0,
-  .lg\:fixed,
-  [role="navigation"] {
-    display: none !important;
+  /* ===== BOM PRINT PAGE ===== */
+  .bom-print-page {
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #111827;
+    padding: 0;
+    margin: 0;
+    width: 100%;
   }
 
-  /* Header und Footer verstecken */
-  header,
-  footer,
-  [role="banner"],
-  [role="contentinfo"] {
-    display: none !important;
+  /* ===== HEADER ===== */
+  .bom-print-header {
+    margin-bottom: 24px;
+    border-bottom: 2px solid #374151;
+    padding-bottom: 16px;
   }
 
-  /* Alle Buttons verstecken */
-  button {
-    display: none !important;
+  .bom-print-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+    color: #111827;
   }
 
-  /* Modal-Header und -Footer verstecken */
-  .sticky.top-0,
-  .sticky.bottom-0,
-  .border-b.border-gray-200,
-  .bg-gray-50.px-6.py-4 {
-    display: none !important;
+  .bom-header-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    font-size: 12px;
   }
 
-  /* Projekt-Liste links verstecken */
-  .w-80,
-  .w-96,
-  .min-w-80,
-  [class*="project-list"],
-  .border-r {
-    display: none !important;
+  .bom-label {
+    font-weight: 600;
+    color: #6b7280;
+    display: block;
+    margin-bottom: 4px;
   }
 
-  /* Collapsible Section Headers verstecken (außer für BOM) */
-  .bom-print-container ~ *,
-  .space-y-4 > div:not(.bom-print-container) {
-    display: none !important;
+  .bom-value {
+    margin: 0;
+    font-weight: 500;
+    color: #111827;
   }
 
-  /* ===== BOM CONTENT STYLING ===== */
-
-  /* Print Header sichtbar */
-  .bom-print-container .hidden.print\:block,
-  .bom-print-container .print-header {
-    display: block !important;
+  .bom-sub {
+    margin: 4px 0 0 0;
+    font-size: 11px;
+    color: #6b7280;
   }
 
-  /* Print Hidden Elements */
-  .bom-print-container .print\:hidden,
-  .print\:hidden {
-    display: none !important;
+  /* ===== KATEGORIEN ===== */
+  .bom-category {
+    margin-bottom: 20px;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  /* Container-Styling */
-  .bom-print-container {
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-  }
-
-  /* Print Header */
-  .bom-print-container .print-header {
-    margin-bottom: 24px !important;
-    padding-bottom: 16px !important;
-    border-bottom: 2px solid #374151 !important;
-  }
-
-  .bom-print-container .print-header h1 {
-    font-size: 24px !important;
-    font-weight: 700 !important;
-    margin: 0 0 16px 0 !important;
-    color: #111827 !important;
-  }
-
-  .bom-print-container .print-header .grid {
-    display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: 20px !important;
+  .bom-category h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 4px;
   }
 
   /* ===== TABELLEN ===== */
-
-  /* Tabellen-Container */
-  .bom-print-container > div {
-    display: block !important;
-    margin-bottom: 16px !important;
+  .bom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    /* WICHTIG: Tabelle darf über Seiten umbrechen */
+    page-break-inside: auto;
   }
 
-  /* Tabellen */
-  .bom-print-container table,
-  .print-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    font-size: 11px !important;
-    page-break-inside: auto !important;
+  /* Tabellen-Header auf JEDER Seite wiederholen */
+  .bom-table thead {
+    display: table-header-group;
   }
 
-  /* Tabellen-Header auf jeder Seite */
-  .print-table thead {
-    display: table-header-group !important;
-  }
-
-  /* Zeilen nicht umbrechen */
-  .print-table tr {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-
-  /* Tabellen-Zellen */
-  .bom-print-container th,
-  .bom-print-container td {
-    border: 1px solid #d1d5db !important;
-    padding: 8px !important;
-  }
-
-  .bom-print-container th {
+  .bom-table th {
+    border: 1px solid #d1d5db;
+    padding: 8px;
+    text-align: left;
     background: #f3f4f6 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    font-weight: 600 !important;
-    font-size: 10px !important;
-    text-transform: uppercase !important;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
   }
 
-  /* Kategorie-Header */
-  .bom-print-container h4 {
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    margin-bottom: 8px !important;
-    color: #374151 !important;
+  .bom-table td {
+    border: 1px solid #d1d5db;
+    padding: 8px;
+    vertical-align: top;
   }
 
-  /* ===== FARBEN FÜR DRUCK ===== */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  /* WICHTIG: Zeilen nicht umbrechen */
+  .bom-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
-  /* Hintergründe entfernen (außer Tabellen-Header) */
-  .bg-green-50,
-  .bg-green-100,
-  .bg-blue-50,
-  .bg-blue-100,
-  .bg-gray-50:not(th):not(thead tr) {
-    background: white !important;
+  .bom-table tbody {
+    /* Body darf umbrechen */
+    page-break-inside: auto;
   }
 
-  /* Schatten und Rundungen entfernen */
-  .rounded-lg,
-  .rounded-xl,
-  .shadow,
-  .shadow-sm,
-  .shadow-lg {
-    box-shadow: none !important;
-    border-radius: 0 !important;
+  .bom-material-name {
+    font-weight: 500;
+    color: #111827;
   }
 
-  /* Print Utility Classes */
-  .print\:border { border: 1px solid #d1d5db !important; }
-  .print\:border-t { border-top: 1px solid #d1d5db !important; }
-  .print\:pt-2 { padding-top: 0.5rem !important; }
-  .print\:mt-4 { margin-top: 1rem !important; }
+  .bom-material-id {
+    font-size: 10px;
+    color: #6b7280;
+  }
+
+  /* ===== FOOTER ===== */
+  .bom-print-footer {
+    margin-top: 24px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+    font-size: 10px;
+    color: #6b7280;
+  }
+}
+
+/* ===== SCREEN: Portal verstecken ===== */
+@media screen {
+  #bom-print-portal {
+    display: none !important;
+  }
 }

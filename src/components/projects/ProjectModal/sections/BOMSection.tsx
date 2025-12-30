@@ -6,16 +6,18 @@
  * 2. Konfigurierte Komponenten (blau)
  * 3. Automatisch berechnetes Material (grau)
  *
- * Druckfunktion nutzt direktes Print-CSS für mehrseitigen Druck.
+ * Druckfunktion nutzt Portal für korrekten mehrseitigen Druck.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, ClipboardList } from 'lucide-react';
 import { useMaterials } from '@context/MaterialContext';
 import { aggregateProjectBookings, splitAggregatedByCategory } from '@services/BookingAggregationService';
 import { formatProjectAddressDisplay } from '@utils/projectHelpers';
 import type { Project, Customer } from '@app-types';
 import type { ExtendedBooking } from '@app-types/contexts/booking.types';
+import type { AggregatedMaterial } from '@services/BookingAggregationService';
 import BOMReadOnlyTable from './BOMReadOnlyTable';
 import './BOMSection.print.css';
 
@@ -25,8 +27,148 @@ interface BOMSectionProps {
   bookings: ExtendedBooking[];
 }
 
+/**
+ * Print-Content Komponente - wird im Portal gerendert
+ */
+interface PrintContentProps {
+  project: Project;
+  customer: Customer | null;
+  manualItems: AggregatedMaterial[];
+  configuredItems: AggregatedMaterial[];
+  autoItems: AggregatedMaterial[];
+}
+
+const PrintContent: React.FC<PrintContentProps> = ({
+  project,
+  customer,
+  manualItems,
+  configuredItems,
+  autoItems
+}) => {
+  const totalCount = manualItems.length + configuredItems.length + autoItems.length;
+
+  return (
+    <div className="bom-print-page">
+      {/* Header */}
+      <div className="bom-print-header">
+        <h1>Stückliste</h1>
+        <div className="bom-header-grid">
+          <div>
+            <span className="bom-label">Projekt:</span>
+            <p className="bom-value">{project.name}</p>
+            <p className="bom-sub">Status: {project.status}</p>
+          </div>
+          <div>
+            <span className="bom-label">Kunde:</span>
+            <p className="bom-value">{customer?.firmennameKundenname || '-'}</p>
+          </div>
+          <div>
+            <span className="bom-label">Adresse:</span>
+            <p className="bom-value">{formatProjectAddressDisplay(project) || '-'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabellen */}
+      {manualItems.length > 0 && (
+        <div className="bom-category">
+          <h3>Manuell hinzugefügt ({manualItems.length})</h3>
+          <table className="bom-table">
+            <thead>
+              <tr>
+                <th style={{ width: '60px' }}>Pos.</th>
+                <th>Material</th>
+                <th style={{ width: '100px' }}>Stk/Einheit</th>
+                <th style={{ width: '80px' }}>Anzahl</th>
+              </tr>
+            </thead>
+            <tbody>
+              {manualItems.map((item, index) => (
+                <tr key={item.materialId || item.materialID}>
+                  <td style={{ textAlign: 'center' }}>{index + 1}</td>
+                  <td>
+                    <div className="bom-material-name">{item.description}</div>
+                    <div className="bom-material-id">{item.materialID}</div>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>{item.itemsPerUnit || 1} {item.unit}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 600 }}>{item.netQuantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {configuredItems.length > 0 && (
+        <div className="bom-category">
+          <h3>Konfigurierte Komponenten ({configuredItems.length})</h3>
+          <table className="bom-table">
+            <thead>
+              <tr>
+                <th style={{ width: '60px' }}>Pos.</th>
+                <th>Material</th>
+                <th style={{ width: '100px' }}>Stk/Einheit</th>
+                <th style={{ width: '80px' }}>Anzahl</th>
+              </tr>
+            </thead>
+            <tbody>
+              {configuredItems.map((item, index) => (
+                <tr key={item.materialId || item.materialID}>
+                  <td style={{ textAlign: 'center' }}>{manualItems.length + index + 1}</td>
+                  <td>
+                    <div className="bom-material-name">{item.description}</div>
+                    <div className="bom-material-id">{item.materialID}</div>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>{item.itemsPerUnit || 1} {item.unit}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 600 }}>{item.netQuantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {autoItems.length > 0 && (
+        <div className="bom-category">
+          <h3>Automatisch berechnetes Material ({autoItems.length})</h3>
+          <table className="bom-table">
+            <thead>
+              <tr>
+                <th style={{ width: '60px' }}>Pos.</th>
+                <th>Material</th>
+                <th style={{ width: '100px' }}>Stk/Einheit</th>
+                <th style={{ width: '80px' }}>Anzahl</th>
+              </tr>
+            </thead>
+            <tbody>
+              {autoItems.map((item, index) => (
+                <tr key={item.materialId || item.materialID}>
+                  <td style={{ textAlign: 'center' }}>{manualItems.length + configuredItems.length + index + 1}</td>
+                  <td>
+                    <div className="bom-material-name">{item.description}</div>
+                    <div className="bom-material-id">{item.materialID}</div>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>{item.itemsPerUnit || 1} {item.unit}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 600 }}>{item.netQuantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="bom-print-footer">
+        Gesamt: {totalCount} Position{totalCount !== 1 ? 'en' : ''} |
+        Mengen = Ausgang - Eingang (Netto)
+      </div>
+    </div>
+  );
+};
+
 const BOMSection: React.FC<BOMSectionProps> = ({ project, customer, bookings }) => {
   const { materials } = useMaterials();
+  const [printPortal, setPrintPortal] = useState<HTMLElement | null>(null);
 
   // Aggregation mit neuem Service (OUT - IN)
   const aggregatedItems = useMemo(() =>
@@ -40,10 +182,29 @@ const BOMSection: React.FC<BOMSectionProps> = ({ project, customer, bookings }) 
     [aggregatedItems]
   );
 
-  // Einfacher Print-Handler
-  const handlePrint = () => {
-    window.print();
-  };
+  // Portal-basierter Print-Handler
+  const handlePrint = useCallback(() => {
+    // Portal-Element erstellen und an body anhängen
+    const portalEl = document.createElement('div');
+    portalEl.id = 'bom-print-portal';
+    document.body.appendChild(portalEl);
+    setPrintPortal(portalEl);
+
+    // Warten bis Portal gerendert, dann drucken
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.print();
+
+        // Nach Druck aufräumen
+        setTimeout(() => {
+          if (document.body.contains(portalEl)) {
+            document.body.removeChild(portalEl);
+          }
+          setPrintPortal(null);
+        }, 500);
+      }, 100);
+    });
+  }, []);
 
   // Gesamtanzahl für Count-Badge
   const totalCount = aggregatedItems.length;
@@ -62,29 +223,9 @@ const BOMSection: React.FC<BOMSectionProps> = ({ project, customer, bookings }) 
   }
 
   return (
-    <div className="bom-print-container space-y-4">
-      {/* Print Header (nur im Druck sichtbar) */}
-      <div className="hidden print:block print-header mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Stückliste</h1>
-        <div className="grid grid-cols-3 gap-4 text-sm border-b border-gray-300 pb-4">
-          <div>
-            <span className="font-medium text-gray-600 block">Projekt:</span>
-            <p className="text-gray-900">{project.name}</p>
-            <p className="text-xs text-gray-500">Status: {project.status}</p>
-          </div>
-          <div>
-            <span className="font-medium text-gray-600 block">Kunde:</span>
-            <p className="text-gray-900">{customer?.firmennameKundenname || '-'}</p>
-          </div>
-          <div>
-            <span className="font-medium text-gray-600 block">Adresse:</span>
-            <p className="text-gray-900">{formatProjectAddressDisplay(project) || '-'}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Drucken-Button (nur auf Screen) */}
-      <div className="flex justify-end print:hidden">
+    <div className="space-y-4">
+      {/* Drucken-Button */}
+      <div className="flex justify-end">
         <button
           onClick={handlePrint}
           className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
@@ -94,7 +235,7 @@ const BOMSection: React.FC<BOMSectionProps> = ({ project, customer, bookings }) 
         </button>
       </div>
 
-      {/* Tabellen nach Kategorie */}
+      {/* Tabellen nach Kategorie (Screen-Ansicht) */}
       {manualItems.length > 0 && (
         <BOMReadOnlyTable
           title="Manuell hinzugefügt"
@@ -122,11 +263,23 @@ const BOMSection: React.FC<BOMSectionProps> = ({ project, customer, bookings }) 
         />
       )}
 
-      {/* Zusammenfassung / Print Footer */}
-      <div className="text-xs text-gray-500 text-center print:mt-4 print:border-t print:pt-2">
+      {/* Zusammenfassung */}
+      <div className="text-xs text-gray-500 text-center">
         Gesamt: {totalCount} Position{totalCount !== 1 ? 'en' : ''} |
         Mengen = Ausgang - Eingang (Netto)
       </div>
+
+      {/* Print Portal - außerhalb #root gerendert */}
+      {printPortal && createPortal(
+        <PrintContent
+          project={project}
+          customer={customer}
+          manualItems={manualItems}
+          configuredItems={configuredItems}
+          autoItems={autoItems}
+        />,
+        printPortal
+      )}
     </div>
   );
 };
