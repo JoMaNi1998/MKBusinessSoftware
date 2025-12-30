@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { CustomerService } from '../services/firebaseService';
+import { useAuth } from './AuthContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
+import { useRoleSafe } from './RoleContext';
 import type { CustomerContextValue, ExtendedCustomer } from '../types/contexts/customer.types';
 import type { Customer, Project } from '../types';
 
@@ -19,13 +21,22 @@ interface CustomerProviderProps {
 }
 
 export const CustomerProvider: React.FC<CustomerProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+
+  // Rollen-Check: Monteure haben keinen Zugriff auf Kunden
+  const { permissions } = useRoleSafe();
+  const isMonteurOnly = permissions.length === 1 && permissions.includes('monteur');
+
   // Firebase Real-time Listener mit Custom Hook
+  // Nur laden wenn User eingeloggt und NICHT nur Monteur
   const {
     data: customers,
     loading: listenerLoading,
     error: listenerError,
     setData: setCustomers
-  } = useFirebaseListener<ExtendedCustomer>(CustomerService.subscribeToCustomers);
+  } = useFirebaseListener<ExtendedCustomer>(CustomerService.subscribeToCustomers, {
+    enabled: !!user && !isMonteurOnly
+  });
 
   // CRUD Operations Hook
   const crud = useFirebaseCRUD();

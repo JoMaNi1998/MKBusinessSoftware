@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { ProjectService } from '../services/firebaseService';
+import { useAuth } from './AuthContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 import type { ProjectContextValue } from '../types/contexts/project.types';
 import type { Project } from '../types';
@@ -20,12 +21,17 @@ interface ProjectProviderProps {
 }
 
 export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+
   // Firebase Real-time Listener mit Custom Hook
+  // Nur laden wenn User eingeloggt ist
   const {
     data: projects,
     loading: listenerLoading,
     error: listenerError
-  } = useFirebaseListener<Project>(ProjectService.subscribeToProjects);
+  } = useFirebaseListener<Project>(ProjectService.subscribeToProjects, {
+    enabled: !!user
+  });
 
   // CRUD Operations Hook
   const crud = useFirebaseCRUD();

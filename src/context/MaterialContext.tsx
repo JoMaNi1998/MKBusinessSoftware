@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { MaterialService } from '../services/firebaseService';
+import { useAuth } from './AuthContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 import type { MaterialContextValue, ExtendedMaterial } from '../types/contexts/material.types';
 import type { Material } from '../types';
@@ -20,12 +21,17 @@ interface MaterialProviderProps {
 }
 
 export const MaterialProvider: React.FC<MaterialProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+
   // Firebase Real-time Listener mit Custom Hook
+  // Nur laden wenn User eingeloggt ist
   const {
     data: materials,
     loading: listenerLoading,
     error: listenerError
-  } = useFirebaseListener<Material>(MaterialService.subscribeToMaterials);
+  } = useFirebaseListener<Material>(MaterialService.subscribeToMaterials, {
+    enabled: !!user
+  });
 
   // CRUD Operations Hook
   const crud = useFirebaseCRUD();

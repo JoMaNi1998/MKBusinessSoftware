@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { OfferService } from '../services/firebaseService';
-import { useCalculation } from './CalculationContext';
 import { useAuth } from './AuthContext';
+import { useCalculation } from './CalculationContext';
+import { useRoleSafe } from './RoleContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 import type {
   OfferContextValue,
@@ -38,12 +39,21 @@ interface OfferProviderProps {
 }
 
 export const OfferProvider: React.FC<OfferProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+
+  // Rollen-Check: Monteure haben keinen Zugriff auf Angebote
+  const { permissions } = useRoleSafe();
+  const isMonteurOnly = permissions.length === 1 && permissions.includes('monteur');
+
   // Firebase Real-time Listener mit Custom Hook
+  // Nur laden wenn User eingeloggt und NICHT nur Monteur
   const {
     data: offers,
     loading: listenerLoading,
     error: listenerError
-  } = useFirebaseListener<Offer>(OfferService.subscribeToOffers);
+  } = useFirebaseListener<Offer>(OfferService.subscribeToOffers, {
+    enabled: !!user && !isMonteurOnly
+  });
 
   // CRUD Operations Hook
   const crud = useFirebaseCRUD();
@@ -53,7 +63,6 @@ export const OfferProvider: React.FC<OfferProviderProps> = ({ children }) => {
   const error = listenerError || crud.error;
 
   const { calculateOfferTotals, calculateValidUntil, settings: calcSettings } = useCalculation();
-  const { user } = useAuth();
 
   // Neues Angebot erstellen
   const createOffer = useCallback(async (

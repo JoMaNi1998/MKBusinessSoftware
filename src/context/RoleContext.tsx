@@ -62,9 +62,6 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
       const token = await user.getIdTokenResult(true);
       const claims = token.claims;
 
-      // DEBUG: Claims anzeigen
-      console.log('🔑 User Claims:', { role: claims.role, permissions: claims.permissions, allClaims: claims });
-
       if (claims.role && claims.permissions) {
         setUserRole(claims.role as string);
         setPermissions((claims.permissions as string[]) || []);

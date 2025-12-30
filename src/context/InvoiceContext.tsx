@@ -3,6 +3,7 @@ import { InvoiceService } from '../services/firebaseService';
 import { CounterService } from '../services/CounterService';
 import { useAuth } from './AuthContext';
 import { useCalculation } from './CalculationContext';
+import { useRoleSafe } from './RoleContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 import type {
   InvoiceContextValue,
@@ -85,12 +86,19 @@ export const InvoiceProvider: React.FC<InvoiceProviderProps> = ({ children }) =>
   const { user } = useAuth();
   const { calculateOfferTotals } = useCalculation();
 
+  // Rollen-Check: Monteure haben keinen Zugriff auf Rechnungen
+  const { permissions } = useRoleSafe();
+  const isMonteurOnly = permissions.length === 1 && permissions.includes('monteur');
+
   // Firebase Real-time Listener
+  // Nur laden wenn User eingeloggt und NICHT nur Monteur
   const {
     data: invoicesData,
     loading: listenerLoading,
     error: listenerError
-  } = useFirebaseListener(InvoiceService.subscribeToInvoices);
+  } = useFirebaseListener(InvoiceService.subscribeToInvoices, {
+    enabled: !!user && !isMonteurOnly
+  });
 
   // Type assertion: Invoice → ExtendedInvoice
   const invoices = invoicesData as ExtendedInvoice[];

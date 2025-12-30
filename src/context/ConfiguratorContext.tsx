@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { ConfiguratorService } from '../services/firebaseService';
 import { useAuth } from './AuthContext';
+import { useRoleSafe } from './RoleContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 import type {
   ConfiguratorContextValue,
@@ -35,12 +36,21 @@ interface ConfiguratorProviderProps {
 }
 
 export const ConfiguratorProvider: React.FC<ConfiguratorProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+
+  // Rollen-Check: Monteure haben keinen Zugriff auf PV-Konfigurationen
+  const { permissions } = useRoleSafe();
+  const isMonteurOnly = permissions.length === 1 && permissions.includes('monteur');
+
   // Firebase Real-time Listener mit Custom Hook
+  // Nur laden wenn User eingeloggt und NICHT nur Monteur
   const {
     data: configurations,
     loading: listenerLoading,
     error: listenerError
-  } = useFirebaseListener<Configuration>(ConfiguratorService.subscribeToConfigurations);
+  } = useFirebaseListener<Configuration>(ConfiguratorService.subscribeToConfigurations, {
+    enabled: !!user && !isMonteurOnly
+  });
 
   // CRUD Operations Hook
   const crud = useFirebaseCRUD();
@@ -48,8 +58,6 @@ export const ConfiguratorProvider: React.FC<ConfiguratorProviderProps> = ({ chil
   // Kombinierter Loading-State
   const loading = listenerLoading || crud.loading;
   const error = listenerError || crud.error;
-
-  const { user } = useAuth();
 
   // Neue Konfiguration erstellen
   const createConfiguration = useCallback(async (configData: Partial<Configuration>): Promise<{

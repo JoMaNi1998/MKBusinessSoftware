@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import { ServiceCatalogService } from '../services/firebaseService';
+import { useAuth } from './AuthContext';
 import { useCalculation } from './CalculationContext';
 import { useMaterials } from './MaterialContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
@@ -27,12 +28,17 @@ interface ServiceCatalogProviderProps {
 }
 
 export const ServiceCatalogProvider: React.FC<ServiceCatalogProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+
   // Firebase Real-time Listener mit Custom Hook
+  // Nur laden wenn User eingeloggt ist
   const {
     data: servicesData,
     loading: listenerLoading,
     error: listenerError
-  } = useFirebaseListener(ServiceCatalogService.subscribeToServices);
+  } = useFirebaseListener(ServiceCatalogService.subscribeToServices, {
+    enabled: !!user
+  });
 
   // Type assertion: ServiceCatalogItem → ExtendedServiceCatalogItem
   const services = servicesData as ExtendedServiceCatalogItem[];

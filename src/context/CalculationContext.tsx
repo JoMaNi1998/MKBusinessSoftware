@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CalculationSettingsService } from '../services/firebaseService';
+import { useAuth } from './AuthContext';
 import type {
   CalculationContextValue,
   CalculationSettings,
@@ -95,13 +96,21 @@ interface CalculationProviderProps {
 }
 
 export const CalculationProvider: React.FC<CalculationProviderProps> = ({ children }) => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<CalculationSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
   // Firebase Real-time Listener
+  // Nur laden wenn User eingeloggt ist
   useEffect(() => {
+    // Nicht laden wenn kein User
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     let unsubscribe: (() => void) | undefined;
 
     const setupListener = async (): Promise<void> => {
@@ -144,7 +153,7 @@ export const CalculationProvider: React.FC<CalculationProviderProps> = ({ childr
         unsubscribe();
       }
     };
-  }, []);
+  }, [user]);
 
   // Einstellungen speichern
   const saveSettings = useCallback(async (newSettings: CalculationSettings): Promise<{ success: boolean; error?: string }> => {

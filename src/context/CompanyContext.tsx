@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CompanySettingsService } from '../services/firebaseService';
+import { useAuth } from './AuthContext';
 import type {
   CompanyContextValue,
   CompanySettingsData,
@@ -70,13 +71,21 @@ interface CompanyProviderProps {
 }
 
 export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<CompanySettingsData>(DEFAULT_COMPANY_SETTINGS);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
   // Firebase Real-time Listener
+  // Nur laden wenn User eingeloggt ist
   useEffect(() => {
+    // Nicht laden wenn kein User
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     let unsubscribe: (() => void) | undefined;
 
     const setupListener = async (): Promise<void> => {
@@ -118,7 +127,7 @@ export const CompanyProvider: React.FC<CompanyProviderProps> = ({ children }) =>
         unsubscribe();
       }
     };
-  }, []);
+  }, [user]);
 
   // Einstellungen speichern
   const saveSettings = useCallback(async (newSettings: CompanySettingsData): Promise<{ success: boolean; error?: string }> => {

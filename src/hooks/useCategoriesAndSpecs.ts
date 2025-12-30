@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FirebaseService } from '../services/firebaseService';
+import { useRoleSafe } from '../context/RoleContext';
 import type { Category, Specification } from '../types';
 
 /**
@@ -24,7 +25,17 @@ export const useCategoriesAndSpecs = (isOpen: boolean = true): UseCategoriesAndS
   const [categories, setCategories] = useState<Category[]>([]);
   const [specsByCategoryKey, setSpecsByCategoryKey] = useState<Record<string, Specification[]>>({});
 
+  // Rollen-Check: Monteure haben keinen Zugriff auf categories/specifications
+  const { permissions } = useRoleSafe();
+  const isMonteurOnly = permissions.length === 1 && permissions.includes('monteur');
+
   const reload = useCallback(async () => {
+    // Nicht laden wenn nur Monteur
+    if (isMonteurOnly) {
+      setLoadingMeta(false);
+      return;
+    }
+
     try {
       setLoadingMeta(true);
       const categoriesData = await FirebaseService.getDocuments('categories') as Category[];
@@ -44,11 +55,11 @@ export const useCategoriesAndSpecs = (isOpen: boolean = true): UseCategoriesAndS
     } finally {
       setLoadingMeta(false);
     }
-  }, []);
+  }, [isMonteurOnly]);
 
   useEffect(() => {
-    if (isOpen) reload();
-  }, [isOpen, reload]);
+    if (isOpen && !isMonteurOnly) reload();
+  }, [isOpen, isMonteurOnly, reload]);
 
   const findCategoryById = useCallback((categoryId: string): Category | undefined =>
     categories.find((c) => c.id === categoryId),

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { BookingService } from '../services/firebaseService';
+import { useAuth } from './AuthContext';
 import { useFirebaseListener, useFirebaseCRUD } from '../hooks';
 import { useMaterials } from './MaterialContext';
 import type {
@@ -23,12 +24,17 @@ interface BookingProviderProps {
 }
 
 export const BookingProvider: React.FC<BookingProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+
   // Firebase Real-time Listener mit Custom Hook
+  // Nur laden wenn User eingeloggt ist
   const {
     data: bookingsData,
     loading: listenerLoading,
     error: listenerError
-  } = useFirebaseListener(BookingService.subscribeToBookings);
+  } = useFirebaseListener(BookingService.subscribeToBookings, {
+    enabled: !!user
+  });
 
   // Type assertion: Booking → ExtendedBooking
   const bookings = bookingsData as ExtendedBooking[];
