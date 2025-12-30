@@ -35,27 +35,43 @@ import Sidebar from './components/Sidebar';
 import { MonteurLayout } from './components/monteur';
 
 /**
- * RoleBasedRedirect - Leitet Monteure automatisch zu /monteur weiter
+ * RoleBasedRedirect - Leitet zur Startseite basierend auf Rolle
  */
 const RoleBasedRedirect: React.FC = () => {
   const { userRole, loading } = useRoleSafe();
-  const location = useLocation();
 
-  // Warten bis Rolle geladen
   if (loading) {
     return null;
   }
 
-  // Monteure zu /monteur weiterleiten (außer sie sind bereits dort)
-  const isMonteur = userRole === 'monteur';
-  const isOnMonteurRoute = location.pathname.startsWith('/monteur');
-
-  if (isMonteur && !isOnMonteurRoute) {
+  // Monteure zu /monteur, alle anderen zu /materials
+  if (userRole === 'monteur') {
     return <Navigate to="/monteur" replace />;
   }
 
-  // Nicht-Monteure zu /materials weiterleiten
   return <Navigate to="/materials" replace />;
+};
+
+/**
+ * MonteurGuard - Blockiert Monteure vom Zugriff auf Haupt-App
+ */
+const MonteurGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { userRole, loading } = useRoleSafe();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Monteure haben keinen Zugriff auf Haupt-App → zu /monteur umleiten
+  if (userRole === 'monteur') {
+    return <Navigate to="/monteur" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 // App Component - Main entry point
@@ -91,12 +107,12 @@ const App: React.FC = () => {
                           </ProtectedRoute>
                         }
                       />
-                      {/* Haupt-App mit Sidebar */}
+                      {/* Haupt-App mit Sidebar - Monteure werden zu /monteur umgeleitet */}
                       <Route
                         path="/*"
                         element={
                           <ProtectedRoute>
-                            <>
+                            <MonteurGuard>
                               <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
                               <div className="lg:ml-64 h-dvh">
                                 <Routes>
@@ -120,7 +136,7 @@ const App: React.FC = () => {
                                   <Route path="/" element={<RoleBasedRedirect />} />
                                 </Routes>
                               </div>
-                            </>
+                            </MonteurGuard>
                           </ProtectedRoute>
                         }
                       />
