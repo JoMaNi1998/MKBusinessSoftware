@@ -258,7 +258,7 @@ const UserSettings: React.FC = () => {
             >
               <option value={UserRole.ADMIN}>Administrator - Vollzugriff auf alle Module</option>
               <option value={UserRole.PROJEKTLEITER}>Projektleiter - Projekte, Kunden, Bestellungen, PV Konfigurator</option>
-              <option value={UserRole.MONTEUR}>Monteur - Materialien, VDE Protokolle, Buchungen</option>
+              <option value={UserRole.MONTEUR}>Monteur - Materialien, VDE Protokolle, Kunden, Projekte</option>
             </select>
           </div>
 
@@ -366,7 +366,7 @@ const UserSettings: React.FC = () => {
               onChange={(e) => setNewUserRoleSelect(e.target.value as UserRole)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
             >
-              <option value={UserRole.MONTEUR}>Monteur - Materialien, VDE Protokolle</option>
+              <option value={UserRole.MONTEUR}>Monteur - Materialien, VDE Protokolle, Kunden, Projekte</option>
               <option value={UserRole.PROJEKTLEITER}>Projektleiter - Projekte, Kunden, PV Konfigurator</option>
               <option value={UserRole.ADMIN}>Administrator - Vollzugriff</option>
             </select>

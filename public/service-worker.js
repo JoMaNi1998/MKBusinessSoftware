@@ -1,4 +1,4 @@
-/// <reference lib="webworker" />
+// Service Worker für Lagermanagement System
 // Workbox manifest placeholder (required by workbox but not directly used)
 const _manifest = self.__WB_MANIFEST;
 const CACHE_NAME = 'lagermanagement-v1';
@@ -57,4 +57,3 @@ self.addEventListener('fetch', (event) => {
         });
     }));
 });
-export {};

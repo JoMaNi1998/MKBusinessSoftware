@@ -82,6 +82,14 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
     }
 
+    // Spezifikationen
+    match /specifications/{specId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
     // Konfigurationen
     match /configurations/{configId} {
       allow read: if isAuthenticated();
@@ -165,6 +173,14 @@ service cloud.firestore {
 
     // PV-Konfigurationen
     match /pv-configurations/{configId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Projekt-Fotos
+    match /project-photos/{photoId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
