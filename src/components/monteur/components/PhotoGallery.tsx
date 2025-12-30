@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ImageOff } from 'lucide-react';
-import PhotoLightbox from './PhotoLightbox';
+import { PhotoLightbox } from '@components/shared';
 import type { ProjectPhoto } from '@app-types';
 
 interface PhotoGalleryProps {
@@ -21,29 +21,28 @@ interface PhotoGalleryProps {
  * - Lightbox bei Klick
  */
 const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, loading, onDelete }) => {
-  const [selectedPhoto, setSelectedPhoto] = useState<ProjectPhoto | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const handlePhotoClick = (photo: ProjectPhoto, index: number) => {
-    setSelectedPhoto(photo);
+  const handlePhotoClick = (index: number) => {
     setSelectedIndex(index);
   };
 
-  const handleNavigate = (direction: 'prev' | 'next') => {
-    if (direction === 'prev' && selectedIndex > 0) {
+  const handleNavigate = (index: number) => {
+    setSelectedIndex(index);
+  };
+
+  const handleDelete = async (photo: ProjectPhoto) => {
+    await onDelete(photo);
+    // Nach Löschen: Index anpassen oder schließen
+    if (photos.length <= 1) {
+      setSelectedIndex(null);
+    } else if (selectedIndex !== null && selectedIndex >= photos.length - 1) {
       setSelectedIndex(selectedIndex - 1);
-      setSelectedPhoto(photos[selectedIndex - 1]);
-    } else if (direction === 'next' && selectedIndex < photos.length - 1) {
-      setSelectedIndex(selectedIndex + 1);
-      setSelectedPhoto(photos[selectedIndex + 1]);
     }
   };
 
-  const handleDelete = async () => {
-    if (selectedPhoto) {
-      await onDelete(selectedPhoto);
-      setSelectedPhoto(null);
-    }
+  const handleClose = () => {
+    setSelectedIndex(null);
   };
 
   if (loading) {
@@ -72,7 +71,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, loading, onDelete }
         {photos.map((photo, index) => (
           <button
             key={photo.id}
-            onClick={() => handlePhotoClick(photo, index)}
+            onClick={() => handlePhotoClick(index)}
             className="aspect-square relative overflow-hidden rounded-lg bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <img
@@ -85,13 +84,13 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, loading, onDelete }
         ))}
       </div>
 
-      {/* Lightbox */}
-      {selectedPhoto && (
+      {/* Lightbox - nutzt jetzt die shared Komponente */}
+      {selectedIndex !== null && photos[selectedIndex] && (
         <PhotoLightbox
-          photo={selectedPhoto}
-          totalPhotos={photos.length}
+          photo={photos[selectedIndex]}
+          photos={photos}
           currentIndex={selectedIndex}
-          onClose={() => setSelectedPhoto(null)}
+          onClose={handleClose}
           onDelete={handleDelete}
           onNavigate={handleNavigate}
         />

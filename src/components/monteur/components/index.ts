@@ -1,7 +1,7 @@
 export { default as ProjectActionCard } from './ProjectActionCard';
 export { default as PhotoUpload } from './PhotoUpload';
 export { default as PhotoGallery } from './PhotoGallery';
-export { default as PhotoLightbox } from './PhotoLightbox';
+// PhotoLightbox moved to @components/shared
 export { default as MaterialBooking } from './MaterialBooking';
 export { default as OrderRequest } from './OrderRequest';
 export { default as VDEProtocolView } from './VDEProtocolView';
