@@ -5,3 +5,5 @@ export { default as CostBreakdownSection } from './CostBreakdownSection';
 export { default as PhotosSection } from './PhotosSection';
 export { default as BOMSection } from './BOMSection';
 export { default as BOMReadOnlyTable } from './BOMReadOnlyTable';
+export { default as OffersSection } from './OffersSection';
+export { default as InvoicesSection } from './InvoicesSection';

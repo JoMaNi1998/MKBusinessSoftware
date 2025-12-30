@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { Building, Edit, Trash2, Save, Settings, FileText, Package, Euro, Camera, ClipboardList } from 'lucide-react';
+import { Building, Edit, Trash2, Save, Settings, FileText, Package, Euro, Camera, ClipboardList, Receipt } from 'lucide-react';
 import { BaseModal, CollapsibleSection } from '@components/shared';
 import { VDEProtocolModal } from '@components/vde-protocols';
+import OfferPDFPreview from '@components/offers/OfferPDFPreview';
+import InvoicePDFPreview from '@components/invoices/InvoicePDFPreview';
 import { useProjectModal } from '@hooks';
 import { useConfirm } from '@context/ConfirmContext';
 import { useBookings } from '@context/BookingContext';
+import { useOffers } from '@context/OfferContext';
+import { useInvoice } from '@context/InvoiceContext';
 import ProjectForm from './ProjectForm';
 import ProjectViewDetails from './ProjectViewDetails';
 import ProjectViewStats from './ProjectViewStats';
-import { PVConfigurationSection, VDEProtocolsSection, BookingsSection, CostBreakdownSection, PhotosSection, BOMSection } from './sections';
-import type { Project, Customer } from '@app-types';
-import type { ProjectModalMode, VDEProtocol } from '@app-types/components/project.types';
+import { PVConfigurationSection, VDEProtocolsSection, BookingsSection, CostBreakdownSection, PhotosSection, BOMSection, OffersSection, InvoicesSection } from './sections';
+import type { Project, Customer, Offer } from '@app-types';
+import type { ProjectModalMode, VDEProtocol, ProjectOffer, ProjectInvoice } from '@app-types/components/project.types';
 import { ConfirmVariant, NotificationType } from '@app-types/enums';
 
 interface ProjectModalProps {
@@ -43,8 +47,16 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
   const [isVdeProtocolModalOpen, setIsVdeProtocolModalOpen] = useState<boolean>(false);
   const [selectedVdeProtocol, setSelectedVdeProtocol] = useState<VDEProtocol | null>(null);
 
+  const [isOfferPreviewOpen, setIsOfferPreviewOpen] = useState<boolean>(false);
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+
+  const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState<boolean>(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+
   const { confirm } = useConfirm();
   const { undoBooking } = useBookings();
+  const { offers } = useOffers();
+  const { invoices } = useInvoice();
 
   const {
     // Mode flags
@@ -64,6 +76,10 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     loadingVdeProtocols,
     projectCosts,
     loadingCosts,
+    projectOffers,
+    loadingOffers,
+    projectInvoices,
+    loadingInvoices,
 
     // Form data
     formData,
@@ -98,6 +114,32 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     setIsVdeProtocolModalOpen(false);
     setSelectedVdeProtocol(null);
     await loadVdeProtocols();
+  };
+
+  const handleOfferClick = (offer: ProjectOffer): void => {
+    const fullOffer = offers.find(o => o.id === offer.id);
+    if (fullOffer) {
+      setSelectedOffer(fullOffer);
+      setIsOfferPreviewOpen(true);
+    }
+  };
+
+  const handleOfferPreviewClose = (): void => {
+    setIsOfferPreviewOpen(false);
+    setSelectedOffer(null);
+  };
+
+  const handleInvoiceClick = (invoice: ProjectInvoice): void => {
+    const fullInvoice = invoices.find(i => i.id === invoice.id);
+    if (fullInvoice) {
+      setSelectedInvoice(fullInvoice);
+      setIsInvoicePreviewOpen(true);
+    }
+  };
+
+  const handleInvoicePreviewClose = (): void => {
+    setIsInvoicePreviewOpen(false);
+    setSelectedInvoice(null);
   };
 
   const handleUndoBooking = async (bookingId: string): Promise<void> => {
@@ -249,6 +291,32 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
             </CollapsibleSection>
 
             <CollapsibleSection
+              title="Angebote"
+              count={projectOffers.length}
+              icon={FileText}
+              defaultOpen={false}
+            >
+              <OffersSection
+                offers={projectOffers}
+                loading={loadingOffers}
+                onOfferClick={handleOfferClick}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Rechnungen"
+              count={projectInvoices.length}
+              icon={Receipt}
+              defaultOpen={false}
+            >
+              <InvoicesSection
+                invoices={projectInvoices}
+                loading={loadingInvoices}
+                onInvoiceClick={handleInvoiceClick}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection
               title="Baustellenfotos"
               icon={Camera}
               defaultOpen={false}
@@ -265,6 +333,24 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
             onClose={handleVdeProtocolClose}
             protocol={selectedVdeProtocol}
             hideActions={false}
+          />
+        )}
+
+        {/* Offer PDF Preview Modal */}
+        {isOfferPreviewOpen && (
+          <OfferPDFPreview
+            offer={selectedOffer}
+            isOpen={isOfferPreviewOpen}
+            onClose={handleOfferPreviewClose}
+          />
+        )}
+
+        {/* Invoice PDF Preview Modal */}
+        {isInvoicePreviewOpen && (
+          <InvoicePDFPreview
+            invoice={selectedInvoice}
+            isOpen={isInvoicePreviewOpen}
+            onClose={handleInvoicePreviewClose}
           />
         )}
       </>

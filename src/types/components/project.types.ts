@@ -144,6 +144,10 @@ export interface UseProjectModalReturn {
   loadingVdeProtocols: boolean;
   projectCosts: number;
   loadingCosts: boolean;
+  projectOffers: ProjectOffer[];
+  loadingOffers: boolean;
+  projectInvoices: ProjectInvoice[];
+  loadingInvoices: boolean;
 
   // Form data
   formData: ProjectFormData;
@@ -329,6 +333,44 @@ export interface PVConfigurationSectionProps {
 export interface VDEProtocolsSectionProps {
   protocols: VDEProtocol[];
   loading: boolean;
+}
+
+// ============================================
+// OFFER & INVOICE SECTION TYPES
+// ============================================
+
+export interface ProjectOffer {
+  id: string;
+  offerNumber: string;
+  status: string;
+  totals?: {
+    grossTotal: number;
+  };
+  offerDate?: string;
+  createdAt?: any;
+}
+
+export interface ProjectInvoice {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  totals?: {
+    grossTotal: number;
+  };
+  invoiceDate?: string;
+  createdAt?: any;
+}
+
+export interface OffersSectionProps {
+  offers: ProjectOffer[];
+  loading: boolean;
+  onOfferClick: (offer: ProjectOffer) => void;
+}
+
+export interface InvoicesSectionProps {
+  invoices: ProjectInvoice[];
+  loading: boolean;
+  onInvoiceClick: (invoice: ProjectInvoice) => void;
 }
 
 // ============================================

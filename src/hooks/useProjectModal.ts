@@ -3,6 +3,8 @@ import { useBookings } from '@context/BookingContext';
 import { useCustomers } from '@context/CustomerContext';
 import { useNotification } from '@context/NotificationContext';
 import { useConfirm } from '@context/ConfirmContext';
+import { useOffers } from '@context/OfferContext';
+import { useInvoice } from '@context/InvoiceContext';
 import { FirebaseService } from '@services/firebaseService';
 import {
   computeNextProjectId,
@@ -20,6 +22,8 @@ import type {
   ProjectContact,
   ProjectConfiguration,
   VDEProtocol,
+  ProjectOffer,
+  ProjectInvoice,
   UseProjectModalProps,
   UseProjectModalReturn
 } from '@app-types/components/project.types';
@@ -64,6 +68,8 @@ export const useProjectModal = ({
   const { customers: customersCtx = [] } = useCustomers();
   const { showNotification } = useNotification();
   const { confirmDelete } = useConfirm();
+  const { offers = [], getOffersByProject } = useOffers();
+  const { invoices = [] } = useInvoice();
 
   // Kundenliste basierend auf Modus
   const customersList = (isCreate || isEdit) && customersProp.length ? customersProp : customersCtx;
@@ -79,6 +85,12 @@ export const useProjectModal = ({
 
   const [projectCosts, setProjectCosts] = useState<number>(0);
   const [loadingCosts, setLoadingCosts] = useState<boolean>(false);
+
+  const [projectOffers, setProjectOffers] = useState<ProjectOffer[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState<boolean>(false);
+
+  const [projectInvoices, setProjectInvoices] = useState<ProjectInvoice[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState<boolean>(false);
 
   // Formular-spezifische Zustände
   const [formData, setFormData] = useState<ProjectFormData>(INITIAL_FORM_DATA);
@@ -155,6 +167,44 @@ export const useProjectModal = ({
       setLoadingConfigurations(false);
     }
   }, [project?.id]);
+
+  // Projekt-Angebote laden
+  const loadProjectOffers = useCallback((): void => {
+    if (!project?.id) {
+      setProjectOffers([]);
+      setLoadingOffers(false);
+      return;
+    }
+    setLoadingOffers(true);
+    try {
+      const filtered = getOffersByProject(project.id) as ProjectOffer[];
+      setProjectOffers(filtered);
+    } catch (e) {
+      console.error('Fehler beim Laden der Angebote:', e);
+      setProjectOffers([]);
+    } finally {
+      setLoadingOffers(false);
+    }
+  }, [project?.id, getOffersByProject]);
+
+  // Projekt-Rechnungen laden
+  const loadProjectInvoices = useCallback((): void => {
+    if (!project?.id) {
+      setProjectInvoices([]);
+      setLoadingInvoices(false);
+      return;
+    }
+    setLoadingInvoices(true);
+    try {
+      const filtered = invoices.filter((i: any) => i.projectID === project.id) as ProjectInvoice[];
+      setProjectInvoices(filtered);
+    } catch (e) {
+      console.error('Fehler beim Laden der Rechnungen:', e);
+      setProjectInvoices([]);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  }, [project?.id, invoices]);
 
   // Konfiguration löschen
   const deleteConfiguration = useCallback(async (configId: string): Promise<void> => {
@@ -233,6 +283,8 @@ export const useProjectModal = ({
     loadConfigurations();
     loadVdeProtocols();
     loadProjectCosts();
+    loadProjectOffers();
+    loadProjectInvoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isView, project?.id]);
 
@@ -346,6 +398,10 @@ export const useProjectModal = ({
     loadingVdeProtocols,
     projectCosts,
     loadingCosts,
+    projectOffers,
+    loadingOffers,
+    projectInvoices,
+    loadingInvoices,
 
     // Formulardaten
     formData,
