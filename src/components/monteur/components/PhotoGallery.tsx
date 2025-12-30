@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { ImageOff } from 'lucide-react';
+import { ImageOff, Trash2 } from 'lucide-react';
 import { PhotoLightbox } from '@components/shared';
+import { useAuth } from '@context/AuthContext';
+import { useConfirm } from '@context/ConfirmContext';
 import type { ProjectPhoto } from '@app-types';
 
 interface PhotoGalleryProps {
@@ -22,6 +24,8 @@ interface PhotoGalleryProps {
  */
 const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, loading, onDelete }) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const { user } = useAuth();
+  const { confirmDelete } = useConfirm();
 
   const handlePhotoClick = (index: number) => {
     setSelectedIndex(index);
@@ -31,18 +35,22 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, loading, onDelete }
     setSelectedIndex(index);
   };
 
-  const handleDelete = async (photo: ProjectPhoto) => {
-    await onDelete(photo);
-    // Nach Löschen: Index anpassen oder schließen
-    if (photos.length <= 1) {
-      setSelectedIndex(null);
-    } else if (selectedIndex !== null && selectedIndex >= photos.length - 1) {
-      setSelectedIndex(selectedIndex - 1);
+  const handleClose = () => {
+    setSelectedIndex(null);
+  };
+
+  // Foto löschen aus Grid-Vorschau
+  const handleDeleteFromGrid = async (e: React.MouseEvent, photo: ProjectPhoto) => {
+    e.stopPropagation(); // Verhindert das Öffnen der Lightbox
+    const confirmed = await confirmDelete('dieses Foto', 'Foto');
+    if (confirmed) {
+      await onDelete(photo);
     }
   };
 
-  const handleClose = () => {
-    setSelectedIndex(null);
+  // Prüfen ob User das Foto löschen darf (nur eigene Fotos)
+  const canDeletePhoto = (photo: ProjectPhoto): boolean => {
+    return user?.uid === photo.userId;
   };
 
   if (loading) {
@@ -69,10 +77,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, loading, onDelete }
       {/* Foto-Grid */}
       <div className="grid grid-cols-3 gap-1">
         {photos.map((photo, index) => (
-          <button
+          <div
             key={photo.id}
             onClick={() => handlePhotoClick(index)}
-            className="aspect-square relative overflow-hidden rounded-lg bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="aspect-square relative overflow-hidden rounded-lg bg-gray-100 cursor-pointer"
           >
             <img
               src={photo.thumbnail || photo.url}
@@ -80,18 +88,27 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, loading, onDelete }
               className="w-full h-full object-cover"
               loading="lazy"
             />
-          </button>
+            {/* Delete Button - oben rechts */}
+            {canDeletePhoto(photo) && (
+              <button
+                onClick={(e) => handleDeleteFromGrid(e, photo)}
+                className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-colors z-10"
+                aria-label="Foto löschen"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         ))}
       </div>
 
-      {/* Lightbox - nutzt jetzt die shared Komponente */}
+      {/* Lightbox - ohne Delete (Delete ist im Grid) */}
       {selectedIndex !== null && photos[selectedIndex] && (
         <PhotoLightbox
           photo={photos[selectedIndex]}
           photos={photos}
           currentIndex={selectedIndex}
           onClose={handleClose}
-          onDelete={handleDelete}
           onNavigate={handleNavigate}
         />
       )}
