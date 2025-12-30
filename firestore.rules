@@ -154,6 +154,24 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // Service Catalog und PV-Konfigurationen
+    // ==========================================
+
+    // Service Catalog (Leistungskatalog)
+    match /service-catalog/{itemId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // PV-Konfigurationen
+    match /pv-configurations/{configId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // ==========================================
     // Fallback - Alles andere blockieren
     // ==========================================
 
