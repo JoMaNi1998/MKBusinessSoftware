@@ -1,68 +1,34 @@
-import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
-import * as admin from 'firebase-admin';
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const admin = require('firebase-admin');
 
 admin.initializeApp();
 
 /**
- * Rollen-Definition Interface
- */
-interface RoleDefinition {
-  name: string;
-  permissions: string[];
-}
-
-/**
- * Rollen-Mapping
- */
-interface RolesMap {
-  [key: string]: RoleDefinition;
-}
-
-/**
  * Benutzerrollen definieren
  */
-const ROLES: RolesMap = {
+const ROLES = {
   admin: {
     name: 'Administrator',
-    permissions: ['materials', 'customers', 'projects', 'vde', 'bookings', 'orders', 'settings', 'pv-configurator']
+    permissions: ['materials', 'customers', 'projects', 'project-calendar', 'vde', 'bookings', 'orders', 'settings', 'pv-configurator']
   },
   monteur: {
     name: 'Monteur',
-    permissions: ['materials', 'vde', 'bookings']
+    permissions: ['materials', 'vde', 'customers', 'projects']
   },
   projektleiter: {
     name: 'Projektleiter',
-    permissions: ['materials', 'customers', 'projects', 'vde', 'bookings', 'orders', 'pv-configurator']
+    permissions: ['materials', 'customers', 'projects', 'project-calendar', 'vde', 'bookings', 'orders', 'pv-configurator']
   }
 };
 
 /**
- * Custom Claims Interface
- */
-interface CustomClaims {
-  role: string;
-  permissions: string[];
-  isFirstAdmin?: boolean;
-}
-
-/**
- * SetUserRole Request Data
- */
-interface SetUserRoleData {
-  uid: string;
-  role: string;
-}
-
-/**
  * Cloud Function: Benutzer-Rolle setzen (nur für Admins)
  */
-export const setUserRole = onCall(async (request: CallableRequest<SetUserRoleData>) => {
-  // Authentifizierung prüfen
+exports.setUserRole = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Benutzer muss angemeldet sein');
   }
 
-  // Admin-Berechtigung prüfen
   const callerClaims = request.auth.token;
   if (!callerClaims.role || callerClaims.role !== 'admin') {
     throw new HttpsError('permission-denied', 'Nur Admins können Rollen setzen');
@@ -79,15 +45,13 @@ export const setUserRole = onCall(async (request: CallableRequest<SetUserRoleDat
   }
 
   try {
-    // Custom Claims setzen
-    const customClaims: CustomClaims = {
+    const customClaims = {
       role: role,
       permissions: ROLES[role].permissions
     };
 
     await admin.auth().setCustomUserClaims(uid, customClaims);
 
-    // Optional: In Firestore für erweiterte Daten speichern
     await admin.firestore().collection('users').doc(uid).set({
       role: role,
       permissions: ROLES[role].permissions,
@@ -105,13 +69,12 @@ export const setUserRole = onCall(async (request: CallableRequest<SetUserRoleDat
 /**
  * Cloud Function: Ersten Admin einrichten
  */
-export const setupFirstAdmin = onCall(async (request: CallableRequest) => {
+exports.setupFirstAdmin = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Benutzer muss angemeldet sein');
   }
 
   try {
-    // Prüfen ob bereits Admin existiert
     const existingUsers = await admin.firestore()
       .collection('users')
       .where('role', '==', 'admin')
@@ -124,8 +87,7 @@ export const setupFirstAdmin = onCall(async (request: CallableRequest) => {
     const uid = request.auth.uid;
     const user = await admin.auth().getUser(uid);
 
-    // Custom Claims für Admin setzen
-    const adminClaims: CustomClaims = {
+    const adminClaims = {
       role: 'admin',
       permissions: ROLES.admin.permissions,
       isFirstAdmin: true
@@ -133,7 +95,6 @@ export const setupFirstAdmin = onCall(async (request: CallableRequest) => {
 
     await admin.auth().setCustomUserClaims(uid, adminClaims);
 
-    // In Firestore speichern
     await admin.firestore().collection('users').doc(uid).set({
       email: user.email,
       displayName: user.displayName || user.email?.split('@')[0],
@@ -153,9 +114,8 @@ export const setupFirstAdmin = onCall(async (request: CallableRequest) => {
 
 /**
  * Cloud Function: Neuen Benutzer einrichten (manuell aufgerufen nach Registrierung)
- * Ersetzt den automatischen Trigger - keine Identity Platform nötig
  */
-export const setupNewUser = onCall(async (request: CallableRequest) => {
+exports.setupNewUser = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Benutzer muss angemeldet sein');
   }
@@ -163,35 +123,29 @@ export const setupNewUser = onCall(async (request: CallableRequest) => {
   const uid = request.auth.uid;
 
   try {
-    // Prüfen ob User bereits eingerichtet
     const existingUser = await admin.firestore().collection('users').doc(uid).get();
     if (existingUser.exists) {
       return { success: true, message: 'Benutzer bereits eingerichtet', role: existingUser.data()?.role };
     }
 
-    // Prüfen ob bereits Admins existieren
     const existingAdmins = await admin.firestore()
       .collection('users')
       .where('role', '==', 'admin')
       .get();
 
-    // Wenn keine Admins existieren, nichts tun (User muss setupFirstAdmin aufrufen)
     if (existingAdmins.empty) {
       return { success: false, message: 'Kein Admin vorhanden. Bitte setupFirstAdmin aufrufen.' };
     }
 
-    // Als Monteur einrichten
-    const defaultClaims: CustomClaims = {
+    const defaultClaims = {
       role: 'monteur',
       permissions: ROLES.monteur.permissions
     };
 
     const user = await admin.auth().getUser(uid);
 
-    // Custom Claims setzen
     await admin.auth().setCustomUserClaims(uid, defaultClaims);
 
-    // In Firestore speichern
     await admin.firestore().collection('users').doc(uid).set({
       email: user.email,
       displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
@@ -211,10 +165,71 @@ export const setupNewUser = onCall(async (request: CallableRequest) => {
 /**
  * Cloud Function: Alle verfügbaren Rollen abrufen
  */
-export const getRoles = onCall(async (request: CallableRequest) => {
+exports.getRoles = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Benutzer muss angemeldet sein');
   }
 
   return ROLES;
+});
+
+/**
+ * Cloud Function: Neuen Benutzer mit Rolle erstellen (nur für Admins)
+ */
+exports.createUserWithRole = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Benutzer muss angemeldet sein');
+  }
+
+  const callerClaims = request.auth.token;
+  if (!callerClaims.role || callerClaims.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Nur Admins können Benutzer erstellen');
+  }
+
+  const { email, password, displayName, role } = request.data;
+
+  if (!email || !password || !role) {
+    throw new HttpsError('invalid-argument', 'Email, Passwort und Rolle sind erforderlich');
+  }
+
+  if (!ROLES[role]) {
+    throw new HttpsError('invalid-argument', 'Ungültige Rolle');
+  }
+
+  if (password.length < 6) {
+    throw new HttpsError('invalid-argument', 'Passwort muss mindestens 6 Zeichen haben');
+  }
+
+  try {
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: displayName || email.split('@')[0]
+    });
+
+    const customClaims = {
+      role: role,
+      permissions: ROLES[role].permissions
+    };
+    await admin.auth().setCustomUserClaims(userRecord.uid, customClaims);
+
+    await admin.firestore().collection('users').doc(userRecord.uid).set({
+      email: userRecord.email,
+      displayName: userRecord.displayName,
+      role: role,
+      permissions: ROLES[role].permissions,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: request.auth.uid
+    });
+
+    return {
+      success: true,
+      message: `Benutzer "${email}" erfolgreich erstellt`,
+      uid: userRecord.uid
+    };
+  } catch (error) {
+    console.error('Fehler beim Erstellen des Benutzers:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+    throw new HttpsError('internal', errorMessage);
+  }
 });

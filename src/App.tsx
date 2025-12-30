@@ -1,7 +1,7 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { RoleProvider } from './context/RoleContext';
+import { RoleProvider, useRoleSafe } from './context/RoleContext';
 import { MaterialProvider } from './context/MaterialContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { CustomerProvider } from './context/CustomerContext';
@@ -33,6 +33,31 @@ import InvoiceConfigurator from './components/invoices/InvoiceConfigurator';
 import Settings from './components/settings';
 import ProjectCalendar from './components/project-calendar';
 import Sidebar from './components/Sidebar';
+import { MonteurLayout } from './components/monteur';
+
+/**
+ * RoleBasedRedirect - Leitet Monteure automatisch zu /monteur weiter
+ */
+const RoleBasedRedirect: React.FC = () => {
+  const { userRole, loading } = useRoleSafe();
+  const location = useLocation();
+
+  // Warten bis Rolle geladen
+  if (loading) {
+    return null;
+  }
+
+  // Monteure zu /monteur weiterleiten (außer sie sind bereits dort)
+  const isMonteur = userRole === 'monteur';
+  const isOnMonteurRoute = location.pathname.startsWith('/monteur');
+
+  if (isMonteur && !isOnMonteurRoute) {
+    return <Navigate to="/monteur" replace />;
+  }
+
+  // Nicht-Monteure zu /materials weiterleiten
+  return <Navigate to="/materials" replace />;
+};
 
 // App Component - Main entry point
 const App: React.FC = () => {
@@ -58,6 +83,16 @@ const App: React.FC = () => {
                   <div className="min-h-dvh bg-gray-50">
                     <Routes>
                       <Route path="/login" element={<Login />} />
+                      {/* Monteur-Bereich - eigenes Layout ohne Sidebar */}
+                      <Route
+                        path="/monteur/*"
+                        element={
+                          <ProtectedRoute>
+                            <MonteurLayout />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/* Haupt-App mit Sidebar */}
                       <Route
                         path="/*"
                         element={
@@ -84,7 +119,7 @@ const App: React.FC = () => {
                                   <Route path="/invoices/new" element={<InvoiceConfigurator />} />
                                   <Route path="/invoices/:id" element={<InvoiceConfigurator />} />
                                   <Route path="/settings" element={<div className="p-6 h-full"><Settings /></div>} />
-                                  <Route path="/" element={<Navigate to="/materials" replace />} />
+                                  <Route path="/" element={<RoleBasedRedirect />} />
                                 </Routes>
                               </div>
                             </>

@@ -309,7 +309,7 @@ src/components/[feature]/
 
 | Rolle | Berechtigungen |
 |-------|----------------|
-| `admin` | Vollzugriff (materials, customers, projects, vde, bookings, orders, settings, pv-configurator) |
-| `projektleiter` | materials, customers, projects, vde, bookings, orders, pv-configurator |
-| `monteur` | materials, vde, bookings |
+| `admin` | Vollzugriff (materials, customers, projects, project-calendar, vde, bookings, orders, settings, pv-configurator) |
+| `projektleiter` | materials, customers, projects, project-calendar, vde, bookings, orders, pv-configurator |
+| `monteur` | materials, vde, customers, projects |
 

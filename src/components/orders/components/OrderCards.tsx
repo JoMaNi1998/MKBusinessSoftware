@@ -89,7 +89,7 @@ const OrderCards: React.FC<OrderCardsProps> = ({
           {/* Aktionen */}
           {visibleColumns.actions && (
             <div className="mt-3 flex justify-end">
-              {material._displayType === 'ordered' ? (
+              {material._displayType === 'ordered' || material._displayType === 'requested' ? (
                 <button
                   onClick={() => onCancel(material.id)}
                   disabled={isLoading}

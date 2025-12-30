@@ -39,7 +39,8 @@ const INITIAL_FORM_DATA: ProjectFormData = {
   status: 'Aktiv',
   notes: '',
   startDate: '',
-  endDate: ''
+  endDate: '',
+  assignedUsers: []
 };
 
 /**
@@ -215,7 +216,8 @@ export const useProjectModal = ({
         status: project.status || 'Aktiv',
         notes: project.notes || '',
         startDate: project.startDate || '',
-        endDate: project.endDate || ''
+        endDate: project.endDate || '',
+        assignedUsers: project.assignedUsers || []
       });
 
       const cust = customersList.find((c) => c.id === (project.customerID || ''));
@@ -296,6 +298,10 @@ export const useProjectModal = ({
     }));
   }, [selectedCustomerContacts]);
 
+  const handleAssignedUsersChange = useCallback((userIds: string[]): void => {
+    setFormData((prev) => ({ ...prev, assignedUsers: userIds }));
+  }, []);
+
   const validateForm = useCallback((): boolean => {
     const newErrors: ProjectFormErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Projektname ist erforderlich';
@@ -350,6 +356,7 @@ export const useProjectModal = ({
     handleInputChange,
     handleCustomerChange,
     handleContactPersonChange,
+    handleAssignedUsersChange,
     handleSubmit,
     deleteConfiguration,
     loadVdeProtocols,

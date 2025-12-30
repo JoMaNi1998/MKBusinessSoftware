@@ -15,19 +15,20 @@ export const useRole = (): RoleContextValue => {
   return context;
 };
 
-// Sicherer Hook mit Fallback
+// Sicherer Hook mit Fallback - Default: KEIN Zugriff (Security by Default)
 export const useRoleSafe = (): RoleContextValue | RoleContextSafeValue => {
   const context = useContext(RoleContext);
   if (!context) {
     // Fallback-Werte wenn RoleProvider nicht verfügbar ist
+    // WICHTIG: Default ist KEIN Zugriff aus Sicherheitsgründen
     return {
       userRole: null,
       permissions: [],
-      loading: false,
-      hasPermission: () => true,
+      loading: true, // Loading = true verhindert Rendering bis Context da ist
+      hasPermission: () => false,
       isAdmin: () => false,
       isPVAdmin: () => false,
-      canAccessModule: () => true,
+      canAccessModule: () => false,
       assignUserRole: async () => { throw new Error('RoleProvider nicht verfügbar'); },
       setupFirstAdmin: async () => { throw new Error('RoleProvider nicht verfügbar'); },
       loadUserRole: () => {}
@@ -67,12 +68,12 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
       } else {
         // Fallback: Standard-Monteur-Rolle
         setUserRole(UserRole.MONTEUR);
-        setPermissions(['materials', 'vde', 'bookings']);
+        setPermissions(['materials', 'vde', 'customers', 'projects']);
       }
     } catch (error) {
       console.error('Fehler beim Laden der User-Rolle:', error);
       setUserRole(UserRole.MONTEUR);
-      setPermissions(['materials', 'vde', 'bookings']);
+      setPermissions(['materials', 'vde', 'customers', 'projects']);
     } finally {
       setLoading(false);
     }
@@ -106,6 +107,8 @@ export const RoleProvider: React.FC<RoleProviderProps> = ({ children }) => {
   };
 
   const canAccessModule = (module: string): boolean => {
+    // Admins haben Zugriff auf ALLE Module
+    if (isAdmin()) return true;
     return hasPermission(module);
   };
 

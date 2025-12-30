@@ -234,6 +234,7 @@ const VDEProtocolModal: React.FC<VDEProtocolModalProps> = ({
 
       const protocolData = {
         protocolNumber,
+        projectID: (protocol as ProjectConfiguration & { projectID?: string })?.projectID || '',
         customerName: vdeData.customerName || '',
         address: vdeData.address,
         projectName:

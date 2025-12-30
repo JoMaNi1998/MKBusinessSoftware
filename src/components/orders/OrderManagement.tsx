@@ -203,11 +203,12 @@ const OrderManagement: React.FC = () => {
   const addToOrderList = useCallback(async (materialId: string): Promise<void> => {
     const material = materials.find(m => m.id === materialId);
     if (material) {
-      if ((material.stock || 0) >= 0) {
+      if (material.orderStatus !== 'offen' && material.orderStatus !== 'bestellt') {
         try {
           await FirebaseService.updateDocument('materials', materialId, {
-            stock: -1,
-            stockState: 'Nachbestellen',
+            orderStatus: 'offen',
+            orderedQuantity: material.orderQuantity || 1,
+            orderRequestedAt: new Date(),
             updatedAt: new Date()
           });
           showNotification(`${material.description} zur Bestellliste hinzugefügt`, NotificationType.SUCCESS);

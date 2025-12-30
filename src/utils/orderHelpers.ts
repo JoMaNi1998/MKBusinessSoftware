@@ -48,7 +48,7 @@ export const DEFAULT_ORDER_COLUMNS: VisibleColumns = {
 /**
  * Unique Status-Werte für Filter
  */
-export const STATUS_FILTER_OPTIONS = ['alle', 'Bestellt', 'Nachbestellen', 'Niedrig'];
+export const STATUS_FILTER_OPTIONS = ['alle', 'Angefordert', 'Bestellt', 'Nachbestellen', 'Niedrig'];
 
 // ============================================
 // FORMATTING FUNCTIONS
@@ -86,6 +86,8 @@ export const getOrderStatusColor = (material: OrderMaterialDisplay): string => {
       return 'bg-red-100 text-red-800';
     case 'low':
       return 'bg-orange-100 text-orange-800';
+    case 'requested':
+      return 'bg-amber-100 text-amber-800';
     default:
       return 'bg-gray-100 text-gray-800';
   }
@@ -107,6 +109,8 @@ export const getOrderStatusText = (material: OrderMaterialDisplay): string => {
       return `Nachbestellen (${material._displayQuantity})`;
     case 'low':
       return 'Niedrig';
+    case 'requested':
+      return `Angefordert (${material._displayQuantity})`;
     default:
       return 'Auf Lager';
   }

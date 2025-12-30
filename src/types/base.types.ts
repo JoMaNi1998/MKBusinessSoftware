@@ -139,6 +139,8 @@ export interface Project extends BaseDocument {
   projectName?: string;
   title?: string;
   projektName?: string;
+  // Monteur-Zuweisung
+  assignedUsers?: string[];  // Array von User-IDs (Monteure)
 }
 
 // ============================================

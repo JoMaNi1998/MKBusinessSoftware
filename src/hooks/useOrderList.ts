@@ -55,6 +55,15 @@ export const useOrderList = (materials: Material[]): UseOrderListReturn => {
           _displayQuantity: m.orderQuantity || 0
         });
       }
+
+      // Fall 5: Monteur-Anforderung (orderStatus = 'offen')
+      if (m.orderStatus === 'offen') {
+        result.push({
+          ...m,
+          _displayType: 'requested',
+          _displayQuantity: m.orderedQuantity || 1
+        });
+      }
     });
 
     setOrderList(result);
@@ -69,7 +78,9 @@ export const useOrderList = (materials: Material[]): UseOrderListReturn => {
     (m.stock || 0) < 0 && m.orderStatus !== 'bestellt'
   ).length;
 
-  const toOrderCount = lowStockCount + negativeStockCount;
+  const requestedCount = materials.filter(m => m.orderStatus === 'offen').length;
+
+  const toOrderCount = lowStockCount + negativeStockCount + requestedCount;
   const orderedCount = materials.filter(m => m.orderStatus === 'bestellt').length;
   const excludedLowStockCount = materials.filter(m =>
     (m.stock || 0) <= (m.heatStock || 0) && (m.stock || 0) > 0 && m.excludeFromAutoOrder && m.orderStatus !== 'bestellt'

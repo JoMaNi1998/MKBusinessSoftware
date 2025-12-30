@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building, Edit, Trash2, Save, Settings, FileText, Package, Euro } from 'lucide-react';
+import { Building, Edit, Trash2, Save, Settings, FileText, Package, Euro, Camera } from 'lucide-react';
 import { BaseModal, CollapsibleSection } from '@components/shared';
 import { VDEProtocolModal } from '@components/vde-protocols';
 import { useProjectModal } from '@hooks';
@@ -8,7 +8,7 @@ import { useBookings } from '@context/BookingContext';
 import ProjectForm from './ProjectForm';
 import ProjectViewDetails from './ProjectViewDetails';
 import ProjectViewStats from './ProjectViewStats';
-import { PVConfigurationSection, VDEProtocolsSection, BookingsSection, CostBreakdownSection } from './sections';
+import { PVConfigurationSection, VDEProtocolsSection, BookingsSection, CostBreakdownSection, PhotosSection } from './sections';
 import type { Project, Customer } from '@app-types';
 import type { ProjectModalMode, VDEProtocol } from '@app-types/components/project.types';
 import { ConfirmVariant, NotificationType } from '@app-types/enums';
@@ -74,6 +74,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
     handleInputChange,
     handleCustomerChange,
     handleContactPersonChange,
+    handleAssignedUsersChange,
     handleSubmit,
     deleteConfiguration,
     loadVdeProtocols,
@@ -234,6 +235,14 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
             >
               <BookingsSection bookings={projectBookings} onUndoBooking={handleUndoBooking} />
             </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Baustellenfotos"
+              icon={Camera}
+              defaultOpen={false}
+            >
+              <PhotosSection projectId={project.id} />
+            </CollapsibleSection>
           </div>
         </BaseModal>
 
@@ -267,6 +276,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         onInputChange={handleInputChange}
         onCustomerChange={handleCustomerChange}
         onContactPersonChange={handleContactPersonChange}
+        onAssignedUsersChange={handleAssignedUsersChange}
         onSubmit={handleSubmit}
       />
     </BaseModal>

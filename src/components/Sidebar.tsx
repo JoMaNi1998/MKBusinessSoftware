@@ -39,7 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: 'Bestellungen', href: '/orders', icon: ShoppingCart, permission: 'orders' },
     { name: 'Kunden', href: '/customers', icon: Users, permission: 'customers' },
     { name: 'Projekte', href: '/projects', icon: Building, permission: 'projects' },
-    { name: 'Projektkalender', href: '/project-calendar', icon: Calendar, permission: 'projects' },
+    { name: 'Projektkalender', href: '/project-calendar', icon: Calendar, permission: 'project-calendar' },
     { name: 'Buchungshistorie', href: '/bookings', icon: History, permission: 'bookings' },
     { name: 'Stückliste', href: '/bill-of-materials', icon: FileText, permission: 'materials' },
     { name: 'VDE Protokolle', href: '/vde-protocols', icon: FileText, permission: 'vde' },

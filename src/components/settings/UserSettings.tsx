@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   Edit,
-  Users,
   Shield,
   Mail,
-  Loader
+  Loader,
+  UserPlus,
+  Users
 } from 'lucide-react';
 import { FirebaseService } from '@services/firebaseService';
 import { useNotification } from '@context/NotificationContext';
@@ -18,7 +19,7 @@ import { NotificationType } from '@app-types/enums';
 
 const UserSettings: React.FC = () => {
   const { showNotification } = useNotification();
-  const { isAdmin, setupFirstAdmin, userRole } = useRole();
+  const { isAdmin } = useRole();
 
   // User Management States
   const [users, setUsers] = useState<User[]>([]);
@@ -27,7 +28,15 @@ const UserSettings: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newUserRole, setNewUserRole] = useState<UserRole>(UserRole.MONTEUR);
   const [assigningRole, setAssigningRole] = useState<boolean>(false);
-  const [settingUpAdmin, setSettingUpAdmin] = useState<boolean>(false);
+
+  // Create User States
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [newUserEmail, setNewUserEmail] = useState<string>('');
+  const [newUserPassword, setNewUserPassword] = useState<string>('');
+  const [newUserPasswordConfirm, setNewUserPasswordConfirm] = useState<string>('');
+  const [newUserDisplayName, setNewUserDisplayName] = useState<string>('');
+  const [newUserRoleSelect, setNewUserRoleSelect] = useState<UserRole>(UserRole.MONTEUR);
+  const [creatingUser, setCreatingUser] = useState<boolean>(false);
 
   // Load users on mount
   useEffect(() => {
@@ -99,54 +108,56 @@ const UserSettings: React.FC = () => {
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
 
+  const resetCreateForm = (): void => {
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserPasswordConfirm('');
+    setNewUserDisplayName('');
+    setNewUserRoleSelect(UserRole.MONTEUR);
+  };
+
+  const handleCreateUser = async (): Promise<void> => {
+    // Validierung
+    if (!newUserEmail || !newUserPassword) {
+      showNotification('Email und Passwort sind erforderlich', NotificationType.ERROR);
+      return;
+    }
+    if (newUserPassword !== newUserPasswordConfirm) {
+      showNotification('Passwörter stimmen nicht überein', NotificationType.ERROR);
+      return;
+    }
+    if (newUserPassword.length < 6) {
+      showNotification('Passwort muss mindestens 6 Zeichen haben', NotificationType.ERROR);
+      return;
+    }
+
+    setCreatingUser(true);
+    try {
+      const createUserFunction = httpsCallable(functions, 'createUserWithRole');
+      await createUserFunction({
+        email: newUserEmail,
+        password: newUserPassword,
+        displayName: newUserDisplayName || undefined,
+        role: newUserRoleSelect
+      });
+
+      showNotification('Benutzer erfolgreich erstellt', NotificationType.SUCCESS);
+      setIsCreateModalOpen(false);
+      resetCreateForm();
+      loadUsers();
+    } catch (error) {
+      console.error('Fehler beim Erstellen:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      showNotification('Fehler: ' + errorMessage, NotificationType.ERROR);
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
   return (
     <>
       <div className="space-y-6">
-        {/* Admin Setup Banner - nur anzeigen wenn kein Admin existiert */}
-        {!isAdmin() && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex">
-                <Shield className="h-5 w-5 text-yellow-400 mr-3" />
-                <div>
-                  <h3 className="text-sm font-medium text-yellow-800">
-                    Erster Admin einrichten
-                  </h3>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Klicken Sie hier, um sich als ersten Administrator einzurichten.
-                    Aktuelle Rolle: {userRole || 'Keine'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={async () => {
-                  setSettingUpAdmin(true);
-                  try {
-                    const result = await setupFirstAdmin();
-                    const message = (result as any)?.message || 'Sie sind jetzt Administrator!';
-                    showNotification(message, NotificationType.SUCCESS);
-                    window.location.reload();
-                  } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : 'Fehler beim Einrichten des Admins';
-                    showNotification(errorMessage, NotificationType.ERROR);
-                  } finally {
-                    setSettingUpAdmin(false);
-                  }
-                }}
-                disabled={settingUpAdmin}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50"
-              >
-                {settingUpAdmin ? (
-                  <Loader className="animate-spin h-4 w-4 mr-2" />
-                ) : (
-                  <Shield className="h-4 w-4 mr-2" />
-                )}
-                {settingUpAdmin ? 'Wird eingerichtet...' : 'Admin werden'}
-              </button>
-            </div>
-          </div>
-        )}
-
+  
         <div className="flex justify-between items-center">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Benutzerverwaltung</h3>
@@ -155,16 +166,11 @@ const UserSettings: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={loadUsers}
-            disabled={loadingUsers}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
           >
-            {loadingUsers ? (
-              <Loader className="animate-spin h-4 w-4 mr-2" />
-            ) : (
-              <Users className="h-4 w-4 mr-2" />
-            )}
-            Benutzer neu laden
+            <UserPlus className="h-4 w-4 mr-2" />
+            Benutzer hinzufügen
           </button>
         </div>
 
@@ -277,6 +283,120 @@ const UserSettings: React.FC = () => {
                 <div className="flex items-center">
                   <Shield className="h-4 w-4 mr-2" />
                   Rolle zuweisen
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+      </BaseModal>
+
+      {/* Create User Modal */}
+      <BaseModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          resetCreateForm();
+        }}
+        title="Neuen Benutzer erstellen"
+      >
+        <div className="space-y-4">
+          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              E-Mail-Adresse *
+            </label>
+            <input
+              type="email"
+              value={newUserEmail}
+              onChange={(e) => setNewUserEmail(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="email@beispiel.de"
+            />
+          </div>
+
+          {/* Display Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Anzeigename
+            </label>
+            <input
+              type="text"
+              value={newUserDisplayName}
+              onChange={(e) => setNewUserDisplayName(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="Max Mustermann"
+            />
+          </div>
+
+          {/* Passwort */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Passwort *
+            </label>
+            <input
+              type="password"
+              value={newUserPassword}
+              onChange={(e) => setNewUserPassword(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="Mindestens 6 Zeichen"
+            />
+          </div>
+
+          {/* Passwort bestätigen */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Passwort bestätigen *
+            </label>
+            <input
+              type="password"
+              value={newUserPasswordConfirm}
+              onChange={(e) => setNewUserPasswordConfirm(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              placeholder="Passwort wiederholen"
+            />
+          </div>
+
+          {/* Rolle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rolle *
+            </label>
+            <select
+              value={newUserRoleSelect}
+              onChange={(e) => setNewUserRoleSelect(e.target.value as UserRole)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              <option value={UserRole.MONTEUR}>Monteur - Materialien, VDE Protokolle</option>
+              <option value={UserRole.PROJEKTLEITER}>Projektleiter - Projekte, Kunden, PV Konfigurator</option>
+              <option value={UserRole.ADMIN}>Administrator - Vollzugriff</option>
+            </select>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              onClick={() => {
+                setIsCreateModalOpen(false);
+                resetCreateForm();
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={handleCreateUser}
+              disabled={creatingUser}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+            >
+              {creatingUser ? (
+                <div className="flex items-center">
+                  <Loader className="animate-spin h-4 w-4 mr-2" />
+                  Wird erstellt...
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Benutzer erstellen
                 </div>
               )}
             </button>

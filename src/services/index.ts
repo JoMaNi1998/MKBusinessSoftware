@@ -41,3 +41,7 @@ export {
   hasValidationErrors as hasInvoiceValidationErrors,
   calculateInvoiceTotals
 } from './InvoiceService';
+
+// User Service
+export { UserService } from './UserService';
+export type { FirestoreUser } from './UserService';

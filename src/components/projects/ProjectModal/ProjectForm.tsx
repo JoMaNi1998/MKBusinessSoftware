@@ -1,7 +1,8 @@
-import React, { ChangeEvent, FormEvent } from 'react';
-import { Building, User, UserCheck, FileText, MapPin, Calendar } from 'lucide-react';
+import React, { ChangeEvent, FormEvent, useState, useEffect } from 'react';
+import { Building, User, UserCheck, FileText, MapPin, Calendar, Users } from 'lucide-react';
 import { PROJECT_STATUS_OPTIONS } from '@utils/projectHelpers';
 import { cn } from '@utils/customerHelpers';
+import { UserService, FirestoreUser } from '@services/UserService';
 import type { Customer } from '@app-types';
 
 interface Contact {
@@ -27,6 +28,7 @@ interface FormData {
   notes: string;
   startDate: string;
   endDate: string;
+  assignedUsers: string[];
 }
 
 interface FormErrors {
@@ -41,6 +43,7 @@ interface ProjectFormProps {
   onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onCustomerChange: (e: ChangeEvent<HTMLSelectElement>) => void;
   onContactPersonChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+  onAssignedUsersChange: (userIds: string[]) => void;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -52,8 +55,44 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   onInputChange,
   onCustomerChange,
   onContactPersonChange,
+  onAssignedUsersChange,
   onSubmit
 }) => {
+  // State für verfügbare Monteure
+  const [availableUsers, setAvailableUsers] = useState<FirestoreUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+
+  // Monteure beim Mount laden
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        // Lade alle User (Monteure + Projektleiter können zugewiesen werden)
+        const users = await UserService.getAllUsers();
+        // Filtere nur monteur und projektleiter
+        const assignableUsers = users.filter(
+          u => u.role === 'monteur' || u.role === 'projektleiter'
+        );
+        setAvailableUsers(assignableUsers);
+      } catch (error) {
+        console.error('Fehler beim Laden der Benutzer:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    loadUsers();
+  }, []);
+
+  // Handler für Checkbox-Änderungen
+  const handleUserToggle = (userId: string) => {
+    const currentUsers = formData.assignedUsers || [];
+    if (currentUsers.includes(userId)) {
+      onAssignedUsersChange(currentUsers.filter(id => id !== userId));
+    } else {
+      onAssignedUsersChange([...currentUsers, userId]);
+    }
+  };
+
   return (
     <form id="project-form" onSubmit={onSubmit} className="space-y-6">
       {/* Projekt-ID */}
@@ -229,6 +268,61 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Mitarbeiter-Zuweisung */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          <Users className="h-4 w-4 inline mr-1" />
+          Zugewiesene Mitarbeiter
+        </label>
+        {loadingUsers ? (
+          <div className="flex items-center justify-center py-4 text-gray-500">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500 mr-2" />
+            Lade Mitarbeiter...
+          </div>
+        ) : availableUsers.length === 0 ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <p className="text-sm text-gray-500">
+              Keine zuweisbaren Mitarbeiter vorhanden.
+            </p>
+          </div>
+        ) : (
+          <div className="border border-gray-300 rounded-lg divide-y divide-gray-200 max-h-48 overflow-y-auto">
+            {availableUsers.map((user) => {
+              const isChecked = (formData.assignedUsers || []).includes(user.id);
+              return (
+                <label
+                  key={user.id}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors',
+                    isChecked ? 'bg-primary-50' : 'hover:bg-gray-50'
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleUserToggle(user.id)}
+                    className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {user.displayName || user.email}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {user.role === 'monteur' ? 'Monteur' : 'Projektleiter'}
+                    </p>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        )}
+        {(formData.assignedUsers?.length || 0) > 0 && (
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.assignedUsers?.length} Mitarbeiter zugewiesen
+          </p>
+        )}
       </div>
 
       {/* Projektdaten (Start- und Enddatum) */}

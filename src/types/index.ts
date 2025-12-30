@@ -188,6 +188,9 @@ export type {
 // PV Configurator types
 export * from './components/pvConfigurator.types';
 
+// Project Photo types (Monteur App)
+export * from './components/projectPhoto.types';
+
 // ============================================
 // NOTE: BASE TYPES (TimestampInput, BaseDocument, ServiceResult,
 // CustomerContact, Customer, CustomerInput, Material, MaterialInput,

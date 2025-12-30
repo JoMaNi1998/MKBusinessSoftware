@@ -80,6 +80,7 @@ export interface ProjectFormData {
   notes: string;
   startDate: string;
   endDate: string;
+  assignedUsers: string[];
 }
 
 export interface ProjectFormErrors {
@@ -153,6 +154,7 @@ export interface UseProjectModalReturn {
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   handleCustomerChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   handleContactPersonChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  handleAssignedUsersChange: (userIds: string[]) => void;
   handleSubmit: (evt?: React.FormEvent<HTMLFormElement>) => void;
   deleteConfiguration: (configId: string) => Promise<void>;
   loadVdeProtocols: () => Promise<void>;

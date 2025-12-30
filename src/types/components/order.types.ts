@@ -8,7 +8,7 @@ import type { Material } from '../index';
 // ORDER MATERIAL DISPLAY
 // ============================================
 
-export type DisplayType = 'ordered' | 'additional' | 'needed' | 'low';
+export type DisplayType = 'ordered' | 'additional' | 'needed' | 'low' | 'requested';
 
 export interface OrderMaterialDisplay extends Material {
   _displayType: DisplayType;

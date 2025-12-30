@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   Package,
   Zap,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useCompany } from '@context/CompanyContext';
 import { useCalculation } from '@context/CalculationContext';
+import { useRole } from '@context/RoleContext';
 import CalculationSettings from '../offers/settings/CalculationSettings';
 import ServiceCatalog from '../offers/settings/ServiceCatalog';
 import OfferTextSettings from '../offers/settings/OfferTextSettings';
@@ -34,10 +36,28 @@ interface Tab {
 const Settings: React.FC = () => {
   const { settings: companySettings, saveSettings: saveCompanySettings, saving: savingCompany } = useCompany();
   const { saving: calculationSaving } = useCalculation();
+  const { isAdmin, loading: roleLoading } = useRole();
   const [activeTab, setActiveTab] = useState<TabId>('users');
   const [companyData, setCompanyData] = useState<CompanySettingsData | null>(null);
   const [angeboteSubTab, setAngeboteSubTab] = useState<AngeboteSubTab>('kalkulation');
   const [pvSaving, setPvSaving] = useState<boolean>(false);
+
+  // Berechtigungsprüfung - nur Admins dürfen auf Settings zugreifen
+  if (roleLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="h-8 w-8 animate-spin text-primary-600 mx-auto" />
+          <p className="mt-2 text-gray-600">Berechtigungen werden geprüft...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin()) {
+    // Redirect zu Materials wenn kein Admin
+    return <Navigate to="/materials" replace />;
+  }
 
   const tabs: Tab[] = [
     { id: 'company', name: 'Firma', icon: Building2 },

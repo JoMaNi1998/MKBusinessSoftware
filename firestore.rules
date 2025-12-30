@@ -96,6 +96,14 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
     }
 
+    // VDE-Protokolle
+    match /vde-protocols/{protocolId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
     // ==========================================
     // Settings - Nur Admins dürfen schreiben
     // ==========================================
