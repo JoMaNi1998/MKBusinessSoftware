@@ -26,9 +26,8 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "npm run build:sw && vite",
-    "build": "npm run build:sw && tsc -b && vite build",
-    "build:sw": "tsc --project tsconfig.sw.json",
+    "start": "vite",
+    "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest --passWithNoTests",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx --max-warnings 100",
