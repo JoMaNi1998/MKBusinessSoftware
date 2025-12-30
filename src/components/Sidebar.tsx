@@ -41,7 +41,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
     { name: 'Projekte', href: '/projects', icon: Building, permission: 'projects' },
     { name: 'Projektkalender', href: '/project-calendar', icon: Calendar, permission: 'project-calendar' },
     { name: 'Buchungshistorie', href: '/bookings', icon: History, permission: 'bookings' },
-    { name: 'Stückliste', href: '/bill-of-materials', icon: FileText, permission: 'materials' },
     { name: 'VDE Protokolle', href: '/vde-protocols', icon: FileText, permission: 'vde' },
     { name: 'PV Konfigurator', href: '/pv-configurator', icon: Home, permission: 'pv-configurator' },
     { name: 'Angebote', href: '/offers', icon: FileSpreadsheet, permission: 'pv-configurator' },

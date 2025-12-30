@@ -1,0 +1,223 @@
+/**
+ * BOMSection Print Styles
+ * Direkter Print-CSS Ansatz für mehrseitigen A4 Druck
+ *
+ * WICHTIG: Versteckt ALLES außer .bom-print-container
+ */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  /* ===== ALLES VERSTECKEN ===== */
+  body > * {
+    display: none !important;
+  }
+
+  /* Root-Container der App verstecken */
+  #root {
+    display: none !important;
+  }
+
+  /* ===== NUR BOM-CONTAINER ZEIGEN ===== */
+  /* Pfad zum BOM-Container sichtbar machen */
+  body,
+  #root,
+  #root > *,
+  .fixed.inset-0,
+  [role="dialog"],
+  .overflow-y-auto,
+  .bom-print-container {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    transform: none !important;
+  }
+
+  /* Modal-Backdrop entfernen */
+  .fixed.inset-0.bg-black,
+  .fixed.inset-0.bg-gray-500,
+  [class*="backdrop"],
+  [class*="overlay"] {
+    display: none !important;
+  }
+
+  /* Sidebar komplett verstecken */
+  aside,
+  nav,
+  .sidebar,
+  .fixed.inset-y-0,
+  .lg\:fixed,
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  /* Header und Footer verstecken */
+  header,
+  footer,
+  [role="banner"],
+  [role="contentinfo"] {
+    display: none !important;
+  }
+
+  /* Alle Buttons verstecken */
+  button {
+    display: none !important;
+  }
+
+  /* Modal-Header und -Footer verstecken */
+  .sticky.top-0,
+  .sticky.bottom-0,
+  .border-b.border-gray-200,
+  .bg-gray-50.px-6.py-4 {
+    display: none !important;
+  }
+
+  /* Projekt-Liste links verstecken */
+  .w-80,
+  .w-96,
+  .min-w-80,
+  [class*="project-list"],
+  .border-r {
+    display: none !important;
+  }
+
+  /* Collapsible Section Headers verstecken (außer für BOM) */
+  .bom-print-container ~ *,
+  .space-y-4 > div:not(.bom-print-container) {
+    display: none !important;
+  }
+
+  /* ===== BOM CONTENT STYLING ===== */
+
+  /* Print Header sichtbar */
+  .bom-print-container .hidden.print\:block,
+  .bom-print-container .print-header {
+    display: block !important;
+  }
+
+  /* Print Hidden Elements */
+  .bom-print-container .print\:hidden,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Container-Styling */
+  .bom-print-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Print Header */
+  .bom-print-container .print-header {
+    margin-bottom: 24px !important;
+    padding-bottom: 16px !important;
+    border-bottom: 2px solid #374151 !important;
+  }
+
+  .bom-print-container .print-header h1 {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    margin: 0 0 16px 0 !important;
+    color: #111827 !important;
+  }
+
+  .bom-print-container .print-header .grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 20px !important;
+  }
+
+  /* ===== TABELLEN ===== */
+
+  /* Tabellen-Container */
+  .bom-print-container > div {
+    display: block !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Tabellen */
+  .bom-print-container table,
+  .print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 11px !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Tabellen-Header auf jeder Seite */
+  .print-table thead {
+    display: table-header-group !important;
+  }
+
+  /* Zeilen nicht umbrechen */
+  .print-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Tabellen-Zellen */
+  .bom-print-container th,
+  .bom-print-container td {
+    border: 1px solid #d1d5db !important;
+    padding: 8px !important;
+  }
+
+  .bom-print-container th {
+    background: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-weight: 600 !important;
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+  }
+
+  /* Kategorie-Header */
+  .bom-print-container h4 {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    margin-bottom: 8px !important;
+    color: #374151 !important;
+  }
+
+  /* ===== FARBEN FÜR DRUCK ===== */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hintergründe entfernen (außer Tabellen-Header) */
+  .bg-green-50,
+  .bg-green-100,
+  .bg-blue-50,
+  .bg-blue-100,
+  .bg-gray-50:not(th):not(thead tr) {
+    background: white !important;
+  }
+
+  /* Schatten und Rundungen entfernen */
+  .rounded-lg,
+  .rounded-xl,
+  .shadow,
+  .shadow-sm,
+  .shadow-lg {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Print Utility Classes */
+  .print\:border { border: 1px solid #d1d5db !important; }
+  .print\:border-t { border-top: 1px solid #d1d5db !important; }
+  .print\:pt-2 { padding-top: 0.5rem !important; }
+  .print\:mt-4 { margin-top: 1rem !important; }
+}

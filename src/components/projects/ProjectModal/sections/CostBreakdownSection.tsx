@@ -1,86 +1,48 @@
 import React, { useMemo } from 'react';
 import { Euro, Package } from 'lucide-react';
 import { formatCurrency } from '@utils';
+import { useMaterials } from '@context/MaterialContext';
+import { aggregateProjectBookings } from '@services/BookingAggregationService';
 import type { ExtendedBooking } from '@app-types/contexts/booking.types';
-
-interface MaterialCostSummary {
-  materialID: string;
-  materialName: string;
-  description?: string;
-  totalQuantity: number;
-  avgPricePerUnit: number;
-  totalCost: number;
-}
 
 interface CostBreakdownSectionProps {
   bookings: ExtendedBooking[];
+  projectId?: string;
 }
 
-const CostBreakdownSection: React.FC<CostBreakdownSectionProps> = ({ bookings }) => {
-  // Aggregiere alle Materialien aus OUT-Buchungen
+const CostBreakdownSection: React.FC<CostBreakdownSectionProps> = ({ bookings, projectId }) => {
+  const { materials } = useMaterials();
+
+  // Aggregiere mit neuem Service (OUT - IN)
   const { materialSummaries, totalCost, totalItems } = useMemo(() => {
-    const materialMap = new Map<string, MaterialCostSummary>();
-    let total = 0;
-    let items = 0;
+    // ProjectId aus erstem Booking ermitteln falls nicht übergeben
+    const pid = projectId || bookings.find(b => b.projectID)?.projectID || '';
 
-    for (const booking of bookings) {
-      // Nur OUT-Buchungen (Material wurde für Projekt verwendet)
-      if (booking.type !== 'out') continue;
-
-      if (booking.materials && Array.isArray(booking.materials)) {
-        // Multi-Material Buchung
-        for (const material of booking.materials) {
-          const cost = material.totalCost || (material.priceAtBooking || 0) * material.quantity;
-          total += cost;
-          items += material.quantity;
-
-          const existing = materialMap.get(material.materialID);
-          if (existing) {
-            existing.totalQuantity += material.quantity;
-            existing.totalCost += cost;
-            // Durchschnittspreis neu berechnen
-            existing.avgPricePerUnit = existing.totalCost / existing.totalQuantity;
-          } else {
-            materialMap.set(material.materialID, {
-              materialID: material.materialID,
-              materialName: material.materialName || material.description || material.materialID,
-              description: material.description,
-              totalQuantity: material.quantity,
-              avgPricePerUnit: material.priceAtBooking || 0,
-              totalCost: cost
-            });
-          }
-        }
-      } else if (booking.materialID) {
-        // Single-Material Buchung (Legacy)
-        const pricePerUnit = 0; // Alte Buchungen haben keinen Preis gespeichert
-        const cost = pricePerUnit * booking.quantity;
-        total += cost;
-        items += booking.quantity;
-
-        const existing = materialMap.get(booking.materialID);
-        if (existing) {
-          existing.totalQuantity += booking.quantity;
-          existing.totalCost += cost;
-          existing.avgPricePerUnit = existing.totalCost / existing.totalQuantity;
-        } else {
-          materialMap.set(booking.materialID, {
-            materialID: booking.materialID,
-            materialName: booking.materialName || booking.materialID,
-            description: undefined,
-            totalQuantity: booking.quantity,
-            avgPricePerUnit: pricePerUnit,
-            totalCost: cost
-          });
-        }
-      }
+    if (!pid) {
+      return { materialSummaries: [], totalCost: 0, totalItems: 0 };
     }
 
-    // Sortiere nach Gesamtkosten (höchste zuerst)
-    const summaries = Array.from(materialMap.values()).sort((a, b) => b.totalCost - a.totalCost);
+    // Neue Aggregation mit OUT - IN Berechnung
+    const aggregated = aggregateProjectBookings(pid, bookings, materials);
+
+    // Zu MaterialCostSummary Format konvertieren
+    const summaries = aggregated.map(item => ({
+      materialID: item.materialID,
+      materialName: item.description,
+      description: item.description,
+      totalQuantity: item.netQuantity,      // Netto = OUT - IN
+      avgPricePerUnit: item.avgPricePerUnit,
+      totalCost: item.netCost               // Netto Kosten
+    }));
+
+    // Nach Kosten sortieren (höchste zuerst)
+    summaries.sort((a, b) => b.totalCost - a.totalCost);
+
+    const total = aggregated.reduce((sum, item) => sum + item.netCost, 0);
+    const items = aggregated.reduce((sum, item) => sum + item.netQuantity, 0);
 
     return { materialSummaries: summaries, totalCost: total, totalItems: items };
-  }, [bookings]);
+  }, [bookings, materials, projectId]);
 
   if (materialSummaries.length === 0) {
     return (

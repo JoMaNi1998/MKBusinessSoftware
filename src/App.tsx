@@ -22,7 +22,6 @@ import { OrderManagement } from './components/orders';
 import CustomerManagement from './components/customers/CustomerManagement';
 import { ProjectManagement } from './components/projects';
 import { BookingHistory } from './components/bookings';
-import BillOfMaterials from './components/bill-of-materials';
 import VDEProtocols from './components/vde-protocols';
 import ConfiguratorManagement from './components/pv-configurator/ConfiguratorManagement';
 import PVConfigurator from './components/pv-configurator/PVConfigurator';
@@ -107,7 +106,6 @@ const App: React.FC = () => {
                                   <Route path="/projects" element={<div className="p-6 h-full"><ProjectManagement /></div>} />
                                   <Route path="/project-calendar" element={<div className="p-6 h-full"><ProjectCalendar /></div>} />
                                   <Route path="/bookings" element={<div className="p-6 h-full"><BookingHistory /></div>} />
-                                  <Route path="/bill-of-materials" element={<div className="p-6 h-full"><BillOfMaterials /></div>} />
                                   <Route path="/vde-protocols" element={<div className="p-6 h-full"><VDEProtocols /></div>} />
                                   <Route path="/pv-configurator" element={<div className="p-6 h-full"><ConfiguratorManagement /></div>} />
                                   <Route path="/pv-configurator/new" element={<PVConfigurator />} />

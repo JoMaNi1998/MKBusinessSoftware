@@ -5,6 +5,7 @@ import { useBookings } from '@context/BookingContext';
 import { useNotification } from '@context/NotificationContext';
 import { QRScannerModal } from '@components/shared';
 import { BookingType, NotificationType } from '@app-types/enums';
+import { createBookingData } from '@services/BookingService';
 import type { ExtendedMaterial } from '@app-types/contexts/material.types';
 
 interface SelectedMaterial {
@@ -95,24 +96,18 @@ const MonteurMaterialIn: React.FC = () => {
     setIsBooking(true);
 
     try {
-      // Buchungsmaterialien aufbereiten
-      const bookingMaterials = selectedMaterials.map(item => ({
-        materialId: item.material.id,
-        materialID: item.material.materialID || '',
-        description: item.material.description || '',
-        quantity: item.quantity
-      }));
-
-      // Buchung erstellen
-      await addBooking({
+      // Buchung erstellen mit createBookingData (inkl. priceAtBooking + totalCost)
+      // Hinweis: Reiner Lager-Eingang ohne Projekt-Zuordnung
+      const bookingData = createBookingData({
         type: BookingType.IN,
-        customerID: '',
-        customerName: 'Wareneingang',
-        projectID: '',
-        projectName: '',
-        materials: bookingMaterials,
-        notes: 'Mobil eingebucht (Monteur)'
+        materials: selectedMaterials.map(item => ({
+          material: item.material,
+          quantity: item.quantity
+        })),
+        notes: 'Mobil eingebucht (Monteur) - Lager-Eingang'
       });
+
+      await addBooking(bookingData);
 
       // Bestand aktualisieren
       for (const item of selectedMaterials) {

@@ -1,4 +1,4 @@
-import React, { ReactNode, RefObject, MouseEvent } from 'react';
+import React, { ReactNode, MouseEvent } from 'react';
 import { Users, Filter, MoreVertical } from 'lucide-react';
 import { formatCurrency, formatDate } from '@utils';
 import InvoiceActionsMenu from './InvoiceActionsMenu';
@@ -67,7 +67,7 @@ interface InvoiceTableProps {
   setActiveColumnFilter: (filter: string | null) => void;
   handleColumnFilterChange: (column: string, value: string) => void;
   uniqueStatuses: UniqueStatus[];
-  filterRef: RefObject<HTMLDivElement | null>;
+  filterRef: React.RefObject<HTMLDivElement | null>;
   INVOICE_STATUS: InvoiceStatusMap;
   INVOICE_STATUS_LABELS: InvoiceStatusLabels;
 }
@@ -149,7 +149,7 @@ const InvoiceTable: React.FC<InvoiceTableProps> = ({
                   </button>
                 </div>
                 {activeColumnFilter === 'status' && (
-                  <div ref={filterRef} className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
+                  <div ref={filterRef as React.RefObject<HTMLDivElement>} className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
                     <div className="p-2">
                       <button
                         onClick={() => handleColumnFilterChange('status', 'all')}

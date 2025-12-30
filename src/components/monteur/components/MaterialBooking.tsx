@@ -6,6 +6,8 @@ import { useProjects } from '@context/ProjectContext';
 import { useNotification } from '@context/NotificationContext';
 import { QRScannerModal } from '@components/shared';
 import { BookingType, NotificationType } from '@app-types/enums';
+import { createBookingData } from '@services/BookingService';
+import { validateProjectInBooking } from '@services/BookingAggregationService';
 import type { ExtendedMaterial } from '@app-types/contexts/material.types';
 
 interface MaterialBookingProps {
@@ -27,7 +29,7 @@ interface SelectedMaterial {
  */
 const MaterialBooking: React.FC<MaterialBookingProps> = ({ projectId }) => {
   const { materials, updateMaterialStock } = useMaterials();
-  const { addBooking } = useBookings();
+  const { addBooking, bookings } = useBookings();
   const { getProjectById } = useProjects();
   const { showNotification } = useNotification();
 
@@ -87,7 +89,7 @@ const MaterialBooking: React.FC<MaterialBookingProps> = ({ projectId }) => {
       return;
     }
 
-    // Validierung bei Ausgang
+    // Validierung bei Ausgang (Bestand prüfen)
     if (type === BookingType.OUT) {
       for (const item of selectedMaterials) {
         const material = materials.find(m => m.id === item.materialId);
@@ -101,30 +103,44 @@ const MaterialBooking: React.FC<MaterialBookingProps> = ({ projectId }) => {
       }
     }
 
+    // Validierung bei Eingang auf Projekt (Rückbuchung darf nicht mehr als OUT sein)
+    if (type === BookingType.IN && project) {
+      const validation = validateProjectInBooking(
+        project.id,
+        selectedMaterials,
+        bookings,
+        materials
+      );
+
+      if (!validation.isValid) {
+        const errorMessages = validation.errors.map(e =>
+          `${e.materialName}: Max. ${e.maxAllowed} Stk. verfügbar`
+        ).join('\n');
+
+        showNotification(
+          `Rückbuchung überschreitet Ausgang:\n${errorMessages}`,
+          NotificationType.ERROR
+        );
+        return;
+      }
+    }
+
     setIsBooking(true);
 
     try {
-      // Buchungsmaterialien aufbereiten
-      const bookingMaterials = selectedMaterials.map(item => {
-        const material = materials.find(m => m.id === item.materialId);
-        return {
-          materialId: item.materialId,
-          materialID: material?.materialID || '',
-          description: material?.description || '',
-          quantity: item.quantity
-        };
+      // Buchung erstellen mit createBookingData (inkl. priceAtBooking + totalCost)
+      const bookingData = createBookingData({
+        type,
+        materials: selectedMaterials.map(item => ({
+          material: materials.find(m => m.id === item.materialId)!,
+          quantity: item.quantity,
+          isManual: true  // Manuell vom Monteur
+        })),
+        project,
+        notes: type === BookingType.IN ? 'Rückbuchung (Monteur)' : 'Ausgang (Monteur)'
       });
 
-      // Buchung erstellen
-      await addBooking({
-        type,
-        customerID: project.customerID,
-        customerName: project.customerName || '',
-        projectID: project.id,
-        projectName: project.name || project.projectID || '',
-        materials: bookingMaterials,
-        notes: `Mobil gebucht`
-      });
+      await addBooking(bookingData);
 
       // Bestand aktualisieren
       for (const item of selectedMaterials) {

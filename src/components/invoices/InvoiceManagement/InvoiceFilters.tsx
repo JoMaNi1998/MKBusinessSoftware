@@ -1,4 +1,4 @@
-import React, { ChangeEvent, RefObject } from 'react';
+import React, { ChangeEvent } from 'react';
 import { Search, Settings } from 'lucide-react';
 import { INVOICE_AVAILABLE_COLUMNS as availableColumns } from '@utils';
 
@@ -19,7 +19,7 @@ interface InvoiceFiltersProps {
   showColumnSettings: boolean;
   setShowColumnSettings: (show: boolean) => void;
   toggleColumn: (columnKey: string) => void;
-  columnSettingsRef: RefObject<HTMLDivElement | null>;
+  columnSettingsRef: React.RefObject<HTMLDivElement | null>;
 }
 
 const InvoiceFilters: React.FC<InvoiceFiltersProps> = ({
@@ -50,7 +50,7 @@ const InvoiceFilters: React.FC<InvoiceFiltersProps> = ({
           </div>
         </div>
 
-        <div className="relative column-settings-container" ref={columnSettingsRef}>
+        <div className="relative column-settings-container" ref={columnSettingsRef as React.RefObject<HTMLDivElement>}>
           <button
             onClick={() => setShowColumnSettings(!showColumnSettings)}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"

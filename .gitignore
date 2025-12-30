@@ -4,6 +4,7 @@ node_modules/
 # Build
 build/
 dist/
+*.tsbuildinfo
 
 # Generated Service Worker (compiled from src/service-worker.ts)
 public/service-worker.js

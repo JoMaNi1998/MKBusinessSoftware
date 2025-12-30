@@ -127,7 +127,8 @@ src/
 | `firebaseService.ts` | `addDocument`, `getDocument`, `getDocuments`, `updateDocument`, `deleteDocument`, `subscribeToCollection`, `queryDocuments` |
 | `CounterService.ts` | `getNextNumber(type, prefix)` → z.B. "ANG-2025-0001" |
 | `CustomerService.ts` | `getAllCustomers`, `getCustomer`, `addCustomer`, `updateCustomer`, `deleteCustomer`, `subscribeToCustomers` |
-| `BookingService.ts` | `getAllBookings`, `addBooking`, `updateBooking`, `deleteBooking`, `subscribeToBookings` |
+| `BookingService.ts` | `getAllBookings`, `addBooking`, `updateBooking`, `deleteBooking`, `subscribeToBookings`, `createBookingMaterial`, `createBookingData` |
+| `BookingAggregationService.ts` | `aggregateProjectBookings`, `validateProjectInBooking`, `getMaxReturnableQuantity`, `splitAggregatedByCategory` |
 | `InvoiceService.ts` | `getAllInvoices`, `getInvoice`, `addInvoice`, `updateInvoice`, `deleteInvoice`, `getNextInvoiceNumber` |
 | `BOMService.ts` | `getBOM`, `createBOM`, `updateBOM`, `deleteBOM` |
 

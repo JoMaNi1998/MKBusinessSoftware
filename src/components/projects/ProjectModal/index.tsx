@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building, Edit, Trash2, Save, Settings, FileText, Package, Euro, Camera } from 'lucide-react';
+import { Building, Edit, Trash2, Save, Settings, FileText, Package, Euro, Camera, ClipboardList } from 'lucide-react';
 import { BaseModal, CollapsibleSection } from '@components/shared';
 import { VDEProtocolModal } from '@components/vde-protocols';
 import { useProjectModal } from '@hooks';
@@ -8,7 +8,7 @@ import { useBookings } from '@context/BookingContext';
 import ProjectForm from './ProjectForm';
 import ProjectViewDetails from './ProjectViewDetails';
 import ProjectViewStats from './ProjectViewStats';
-import { PVConfigurationSection, VDEProtocolsSection, BookingsSection, CostBreakdownSection, PhotosSection } from './sections';
+import { PVConfigurationSection, VDEProtocolsSection, BookingsSection, CostBreakdownSection, PhotosSection, BOMSection } from './sections';
 import type { Project, Customer } from '@app-types';
 import type { ProjectModalMode, VDEProtocol } from '@app-types/components/project.types';
 import { ConfirmVariant, NotificationType } from '@app-types/enums';
@@ -234,6 +234,18 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
               defaultOpen={false}
             >
               <BookingsSection bookings={projectBookings} onUndoBooking={handleUndoBooking} />
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Stückliste"
+              icon={ClipboardList}
+              defaultOpen={false}
+            >
+              <BOMSection
+                project={project}
+                customer={customerOfProject}
+                bookings={projectBookings}
+              />
             </CollapsibleSection>
 
             <CollapsibleSection

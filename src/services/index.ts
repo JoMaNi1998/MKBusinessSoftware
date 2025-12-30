@@ -18,9 +18,16 @@ export {
   hasValidationErrors,
   executeStockUpdates,
   resetOrderStatus,
-  generateBookingId
+  generateBookingId,
+  createBookingMaterial,
+  createBookingData
 } from './BookingService';
-export type { BookingValidationErrors, BookingExecutionResult } from './BookingService';
+export type {
+  BookingValidationErrors,
+  BookingExecutionResult,
+  BookingMaterialOptions,
+  CreateBookingParams
+} from './BookingService';
 
 // Customer Service
 export {
@@ -45,3 +52,12 @@ export {
 // User Service
 export { UserService } from './UserService';
 export type { FirestoreUser } from './UserService';
+
+// Booking Aggregation Service
+export {
+  aggregateProjectBookings,
+  getMaxReturnableQuantity,
+  validateProjectInBooking,
+  splitAggregatedByCategory
+} from './BookingAggregationService';
+export type { AggregatedMaterial, InBookingValidationResult } from './BookingAggregationService';

@@ -3,8 +3,9 @@
  * Zentrale Business-Logik für Buchungen
  */
 
-import type { Material } from '@app-types';
+import type { Material, Project } from '@app-types';
 import type { SelectedMaterial } from '@app-types/components/booking.types';
+import type { BookingMaterial } from '@app-types/contexts/booking.types';
 import { BookingType } from '@app-types/enums';
 import { WAREHOUSE_BOOKING, calculateStockChange } from '../utils/bookingHelpers';
 import { FirebaseService } from './firebaseService';
@@ -161,12 +162,122 @@ export const generateBookingId = (type: BookingType, projectId: string): string 
   return `${type}-${projectId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
+// ============================================
+// BOOKING DATA CREATION (DRY)
+// ============================================
+
+/**
+ * Optionen für createBookingMaterial
+ */
+export interface BookingMaterialOptions {
+  isConfigured?: boolean;
+  isManual?: boolean;
+}
+
+/**
+ * Erstellt ein BookingMaterial-Objekt aus einem Material
+ *
+ * Zentrale Funktion für konsistente Buchungs-Daten mit Preis-Tracking.
+ *
+ * @param material - Das Material
+ * @param quantity - Die Menge
+ * @param options - Optionale Flags (isConfigured, isManual)
+ * @returns BookingMaterial mit priceAtBooking und totalCost
+ *
+ * @example
+ * const bm = createBookingMaterial(material, 5, { isManual: true });
+ */
+export const createBookingMaterial = (
+  material: Material,
+  quantity: number,
+  options?: BookingMaterialOptions
+): BookingMaterial & { isConfigured: boolean; isManual: boolean } => {
+  const priceAtBooking = material.price || material.purchasePrice || 0;
+  return {
+    materialID: material.materialID || material.id || '',
+    materialName: material.description || material.bezeichnung || '',
+    description: material.description || material.bezeichnung || '',
+    quantity,
+    priceAtBooking,
+    totalCost: priceAtBooking * quantity,
+    isConfigured: options?.isConfigured || false,
+    isManual: options?.isManual || false
+  };
+};
+
+/**
+ * Parameter für createBookingData
+ */
+export interface CreateBookingParams {
+  type: BookingType;
+  materials: Array<{
+    material: Material;
+    quantity: number;
+    isConfigured?: boolean;
+    isManual?: boolean;
+  }>;
+  project?: Project | null;
+  customerID?: string;
+  customerName?: string;
+  notes?: string;
+}
+
+/**
+ * Erstellt ein komplettes Buchungs-Datenobjekt
+ *
+ * Zentrale Funktion für konsistente Buchungen mit allen erforderlichen Feldern.
+ *
+ * @param params - Buchungsparameter
+ * @returns Buchungs-Datenobjekt ready für addBooking()
+ *
+ * @example
+ * const bookingData = createBookingData({
+ *   type: BookingType.OUT,
+ *   materials: [{ material, quantity: 5, isManual: true }],
+ *   project,
+ *   notes: 'Ausgebucht für Baustelle'
+ * });
+ * await addBooking(bookingData);
+ */
+export const createBookingData = (params: CreateBookingParams) => {
+  const { type, materials, project, customerID, customerName, notes } = params;
+
+  const bookingMaterials = materials.map(item =>
+    createBookingMaterial(item.material, item.quantity, {
+      isConfigured: item.isConfigured,
+      isManual: item.isManual
+    })
+  );
+
+  const defaultCustomerName = type === BookingType.IN
+    ? 'Wareneingang'
+    : 'Warenausgang';
+
+  const defaultNotes = type === BookingType.IN
+    ? 'Eingang gebucht'
+    : project
+      ? `Ausgebucht für Projekt: ${project.name}`
+      : 'Ausgang gebucht';
+
+  return {
+    type,
+    customerID: project?.customerID || customerID || '',
+    customerName: project?.customerName || customerName || defaultCustomerName,
+    projectID: project?.id || '',
+    projectName: project?.name || '',
+    materials: bookingMaterials,
+    notes: notes || defaultNotes
+  };
+};
+
 const BookingService = {
   validateBookingForm,
   hasValidationErrors,
   executeStockUpdates,
   resetOrderStatus,
-  generateBookingId
+  generateBookingId,
+  createBookingMaterial,
+  createBookingData
 };
 
 export default BookingService;

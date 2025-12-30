@@ -18,6 +18,7 @@ import {
   generateBookingId,
   type BookingValidationErrors
 } from '../services/BookingService';
+import { validateProjectInBooking } from '../services/BookingAggregationService';
 import { WAREHOUSE_BOOKING } from '../utils/bookingHelpers';
 import type { SelectedMaterial } from '@app-types/components/booking.types';
 import type { Project, Material } from '@app-types';
@@ -69,7 +70,7 @@ export const useBookingModal = (
   const { customers } = useCustomers();
   const { projects, getProjectsByCustomer } = useProjects();
   const { showNotification } = useNotification();
-  const { addBooking } = useBookings();
+  const { addBooking, bookings } = useBookings();
 
   // State
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -184,6 +185,28 @@ export const useBookingModal = (
 
     if (hasValidationErrors(validationErrors)) {
       return;
+    }
+
+    // Validierung bei IN auf Projekt (Rückbuchung darf nicht mehr als OUT sein)
+    if (type === BookingType.IN && selectedProject) {
+      const validation = validateProjectInBooking(
+        selectedProject,
+        selectedMaterials,
+        bookings,
+        materials
+      );
+
+      if (!validation.isValid) {
+        const errorMessages = validation.errors.map(e =>
+          `${e.materialName}: Max. ${e.maxAllowed} Stk. verfügbar (angefordert: ${e.requested})`
+        ).join('\n');
+
+        showNotification(
+          `Rückbuchung nicht möglich:\n${errorMessages}`,
+          NotificationType.ERROR
+        );
+        return;
+      }
     }
 
     // Execute stock updates

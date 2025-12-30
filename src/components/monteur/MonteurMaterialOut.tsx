@@ -7,6 +7,7 @@ import { useNotification } from '@context/NotificationContext';
 import { useProjects } from '@context/ProjectContext';
 import { QRScannerModal } from '@components/shared';
 import { BookingType, NotificationType } from '@app-types/enums';
+import { createBookingData } from '@services/BookingService';
 import type { ExtendedMaterial } from '@app-types/contexts/material.types';
 
 interface SelectedMaterial {
@@ -122,26 +123,21 @@ const MonteurMaterialOut: React.FC = () => {
     setIsBooking(true);
 
     try {
-      // Buchungsmaterialien aufbereiten
-      const bookingMaterials = selectedMaterials.map(item => ({
-        materialId: item.material.id,
-        materialID: item.material.materialID || '',
-        description: item.material.description || '',
-        quantity: item.quantity
-      }));
-
-      // Buchung erstellen (mit Projekt-Kontext wenn vorhanden)
-      await addBooking({
+      // Buchung erstellen mit createBookingData (inkl. priceAtBooking + totalCost)
+      const bookingData = createBookingData({
         type: BookingType.OUT,
-        customerID: project?.customerID || '',
-        customerName: project?.customerName || 'Warenausgang',
-        projectID: project?.id || '',
-        projectName: project?.name || '',
-        materials: bookingMaterials,
+        materials: selectedMaterials.map(item => ({
+          material: item.material,
+          quantity: item.quantity,
+          isManual: true  // Manuell vom Monteur hinzugefuegt
+        })),
+        project,
         notes: project
           ? `Ausgebucht für Projekt: ${project.name}`
           : 'Mobil ausgebucht (Monteur)'
       });
+
+      await addBooking(bookingData);
 
       // Bestand aktualisieren (negativ fuer Ausgang)
       for (const item of selectedMaterials) {

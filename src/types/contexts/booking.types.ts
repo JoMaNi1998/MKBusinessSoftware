@@ -18,6 +18,8 @@ export interface BookingMaterial {
   quantity: number;
   priceAtBooking?: number;
   totalCost?: number;
+  isConfigured?: boolean;   // Material aus PV-Konfiguration
+  isManual?: boolean;       // Manuell hinzugefügt (Monteur)
 }
 
 export interface ExtendedBooking extends Booking {

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Package, Zap, Edit3, FileText } from 'lucide-react';
-import type { BOMItem } from '@app-types/components/bom.types';
+import type { AggregatedMaterial } from '@services/BookingAggregationService';
 
 interface BOMSectionProps {
   title: string;
   icon: React.ElementType;
-  items: BOMItem[];
+  items: AggregatedMaterial[];
   bgColor: string;
   borderColor: string;
   iconColor: string;
@@ -52,7 +52,7 @@ const BOMSection: React.FC<BOMSectionProps> = ({
         <div className="divide-y divide-gray-100">
           {items.map((item) => (
             <div
-              key={item.id}
+              key={item.materialId}
               className="bg-white px-4 py-3 flex items-center justify-between"
             >
               <div className="flex-1 min-w-0">
@@ -62,7 +62,7 @@ const BOMSection: React.FC<BOMSectionProps> = ({
                 <p className="text-sm text-gray-500">{item.materialID}</p>
               </div>
               <div className="flex-shrink-0 ml-3 text-right">
-                <p className="font-semibold text-gray-900">{item.quantity}</p>
+                <p className="font-semibold text-gray-900">{item.netQuantity}</p>
                 <p className="text-xs text-gray-500">{item.unit}</p>
               </div>
             </div>
@@ -74,9 +74,9 @@ const BOMSection: React.FC<BOMSectionProps> = ({
 };
 
 interface MonteurBOMListProps {
-  configuredItems: BOMItem[];
-  autoItems: BOMItem[];
-  manualItems: BOMItem[];
+  configuredItems: AggregatedMaterial[];
+  autoItems: AggregatedMaterial[];
+  manualItems: AggregatedMaterial[];
 }
 
 /**

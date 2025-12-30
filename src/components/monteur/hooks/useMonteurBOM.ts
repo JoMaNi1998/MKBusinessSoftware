@@ -1,23 +1,24 @@
 /**
  * useMonteurBOM Hook
  * Read-only Hook für Monteur-Stückliste
+ *
+ * Nutzt den BookingAggregationService für korrekte OUT-IN Berechnung.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProjects } from '@context/ProjectContext';
 import { useBookings } from '@context/BookingContext';
 import { useMaterials } from '@context/MaterialContext';
-import { computeBOMFromBookings } from '@services/BOMService';
-import type { BOMItem } from '@app-types/components/bom.types';
+import { aggregateProjectBookings, splitAggregatedByCategory, type AggregatedMaterial } from '@services/BookingAggregationService';
 import type { Project } from '@app-types';
 
 export interface UseMonteurBOMReturn {
   project: Project | null;
-  bomItems: BOMItem[];
-  configuredItems: BOMItem[];
-  autoItems: BOMItem[];
-  manualItems: BOMItem[];
+  bomItems: AggregatedMaterial[];
+  configuredItems: AggregatedMaterial[];
+  autoItems: AggregatedMaterial[];
+  manualItems: AggregatedMaterial[];
   totalCount: number;
   loading: boolean;
 }
@@ -26,6 +27,7 @@ export interface UseMonteurBOMReturn {
  * Hook für read-only Stücklisten-Anzeige im Monteur-Bereich
  *
  * Lädt die Stückliste für das aktuelle Projekt basierend auf der URL-ID.
+ * Nutzt aggregateProjectBookings für korrekte OUT-IN Berechnung.
  *
  * @returns Projekt, BOM-Items (gesamt und kategorisiert), Loading-Status
  */
@@ -35,8 +37,6 @@ export const useMonteurBOM = (): UseMonteurBOMReturn => {
   const { bookings, loading: bookingsLoading } = useBookings();
   const { materials, loading: materialsLoading } = useMaterials();
 
-  const [bomItems, setBomItems] = useState<BOMItem[]>([]);
-
   // Projekt laden
   const project = useMemo(() => {
     return id ? getProjectById(id) ?? null : null;
@@ -45,25 +45,15 @@ export const useMonteurBOM = (): UseMonteurBOMReturn => {
   // Loading-Status kombinieren
   const loading = projectLoading || bookingsLoading || materialsLoading;
 
-  // BOM berechnen wenn alle Daten geladen sind
-  useEffect(() => {
-    if (!project || loading) return;
-
-    const items = computeBOMFromBookings(project, bookings, materials);
-    setBomItems(items);
+  // BOM berechnen mit neuem Service (OUT - IN)
+  const bomItems = useMemo(() => {
+    if (!project || loading) return [];
+    return aggregateProjectBookings(project.id, bookings, materials);
   }, [project, bookings, materials, loading]);
 
   // Items in Kategorien aufteilen
-  const configuredItems = useMemo(() => {
-    return bomItems.filter(item => item.isConfigured);
-  }, [bomItems]);
-
-  const autoItems = useMemo(() => {
-    return bomItems.filter(item => !item.isConfigured && !item.isManual);
-  }, [bomItems]);
-
-  const manualItems = useMemo(() => {
-    return bomItems.filter(item => item.isManual);
+  const { manualItems, configuredItems, autoItems } = useMemo(() => {
+    return splitAggregatedByCategory(bomItems);
   }, [bomItems]);
 
   return {
